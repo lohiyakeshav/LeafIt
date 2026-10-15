@@ -1,0 +1,30 @@
+# Local only: kept on disk, never committed
+
+# Working docs (PRD, plan, decisions, flow, assumptions)
+docs/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Runtime data written by the app
+backend/data/plans/
+
+# Secrets: keys and service accounts never go in git
+.env
+.env.*
+*.pem
+*service-account*.json
+*credentials*.json
+
+# Build outputs (rebuilt from source)
+app/build/
+*.apk
+*.aab
+
+# Editor and OS clutter
+.DS_Store
+.vscode/
+.idea/
+*.iml
