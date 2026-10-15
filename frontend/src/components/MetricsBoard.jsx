@@ -54,33 +54,42 @@ export function MetricsBoard({ metrics: m, breakdown: b, heroSize = 30, stacked 
   return (
     <div>
       {stacked ? (
-        heroes.map((h, i) => (
-          <Reveal key={h.key} delay={i * 0.06}>
-            <div style={{ marginBottom: 18 }}>
-              <HeroStat {...h} size={heroSize} onInfo={() => onInfo?.(h.key)} />
-            </div>
-          </Reveal>
-        ))
+        heroes.map((h, i) => {
+          const { key, ...rest } = h;
+          return (
+            <Reveal key={key} delay={i * 0.06}>
+              <div style={{ marginBottom: 18 }}>
+                <HeroStat {...rest} size={heroSize} onInfo={() => onInfo?.(key)} />
+              </div>
+            </Reveal>
+          );
+        })
       ) : (
         <div style={{ display: 'flex', gap: 0, alignItems: 'stretch' }}>
-          {heroes.map((h, i) => (
-            <div key={h.key} style={{ display: 'flex', flex: 1, alignItems: 'stretch' }}>
-              {i > 0 && <div style={{ width: 1, background: 'var(--rule)', margin: '0 12px' }} />}
-              <Reveal delay={i * 0.06} style={{ flex: 1 }}>
-                <HeroStat {...h} size={heroSize} onInfo={() => onInfo?.(h.key)} />
-              </Reveal>
-            </div>
-          ))}
+          {heroes.map((h, i) => {
+            const { key, ...rest } = h;
+            return (
+              <div key={key} style={{ display: 'flex', flex: 1, alignItems: 'stretch' }}>
+                {i > 0 && <div style={{ width: 1, background: 'var(--rule)', margin: '0 12px' }} />}
+                <Reveal delay={i * 0.06} style={{ flex: 1 }}>
+                  <HeroStat {...rest} size={heroSize} onInfo={() => onInfo?.(key)} />
+                </Reveal>
+              </div>
+            );
+          })}
         </div>
       )}
       <div style={{ height: stacked ? 4 : 16 }} />
       <Reveal delay={0.2}>
         <div style={{ paddingTop: 12, borderTop: '1px solid var(--rule)', display: 'flex', gap: 12 }}>
-          {minor.map((mn, i) => (
-            <div key={mn.key} style={{ flex: 1 }}>
-              <MinorStat {...mn} onInfo={() => onInfo?.(mn.key)} />
-            </div>
-          ))}
+          {minor.map((mn) => {
+            const { key, ...rest } = mn;
+            return (
+              <div key={key} style={{ flex: 1 }}>
+                <MinorStat {...rest} onInfo={() => onInfo?.(key)} />
+              </div>
+            );
+          })}
         </div>
       </Reveal>
     </div>

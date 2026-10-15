@@ -246,7 +246,7 @@ export function AccentText({ text, accent, style = {}, color = 'var(--accent)' }
     return <span style={style}>{text}</span>;
   }
   const i = text.indexOf(accent);
-  const accentSize = (style.fontSize || 16) * 1.12;
+  const accentSize = typeof style.fontSize === 'number' ? style.fontSize * 1.12 : '1.12em';
   return (
     <span style={style}>
       {text.slice(0, i)}
