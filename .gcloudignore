@@ -1,7 +1,15 @@
 **/.venv
 **/__pycache__
 backend/data/plans
+backend/data/areas
 app/*
-!app/build
 docs
 .git
+# `gcloud ... --source .` uploads everything not listed here: keep secrets and local build output out of it
+EarthCredentials.json
+*[Cc]redentials*.json
+*service-account*.json
+**/.env
+**/.env.*
+frontend/node_modules
+frontend/dist

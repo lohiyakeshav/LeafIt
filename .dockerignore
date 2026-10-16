@@ -1,6 +1,15 @@
+backend/data/plans
+backend/data/areas
 **/.venv
 **/__pycache__
-backend/data/plans
 app/*
-!app/build
 docs
+.git
+# never bake secrets or local build output into an image
+EarthCredentials.json
+*[Cc]redentials*.json
+*service-account*.json
+**/.env
+**/.env.*
+frontend/node_modules
+frontend/dist

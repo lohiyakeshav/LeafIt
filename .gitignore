@@ -10,13 +10,17 @@ __pycache__/
 
 # Runtime data written by the app
 backend/data/plans/
+backend/data/areas/
 
 # Secrets: keys and service accounts never go in git
 .env
 .env.*
+!.env.example
 *.pem
 *service-account*.json
 *credentials*.json
+*[Cc]redentials*.json
+EarthCredentials.json
 
 # Build outputs (rebuilt from source)
 app/build/
