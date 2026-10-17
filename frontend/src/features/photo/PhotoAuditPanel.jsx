@@ -149,7 +149,7 @@ export default function PhotoAuditPanel({ onClose, onUseTool }) {
         )}
 
         {error && (
-          <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(255,138,91,0.1)', border: '1px solid var(--warn)', borderRadius: 14 }}>
+          <div style={{ marginTop: 16, padding: '12px 16px', background: 'color-mix(in srgb, var(--warn) 10%, transparent)', border: '1px solid var(--warn)', borderRadius: 14 }}>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--warn)' }}>{error}</span>
           </div>
         )}

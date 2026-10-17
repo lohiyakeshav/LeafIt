@@ -6,6 +6,11 @@
     <title>LeafIt — Heat-action planner · New Delhi</title>
     <meta name="description" content="Test trees, cool roofs and shaded bus stops on a satellite twin of your neighbourhood. Gemini plans with you, every number comes from the simulator." />
     <link rel="icon" type="image/svg+xml" href="/leaf.svg" />
+    <!-- Apply the saved (or system) theme before first paint, so there is no flash of the wrong colours -->
+    <script>
+      try { var t = localStorage.getItem('leafit-theme'); } catch (e) {}
+      document.documentElement.dataset.theme = t || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    </script>
   </head>
   <body>
     <div id="root"></div>

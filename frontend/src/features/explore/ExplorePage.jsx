@@ -6,11 +6,11 @@ import { endpoints } from '../../api/endpoints.js';
 import { prefetch } from '../../app/lazyPages.js';
 import { forgetBlock } from '../../app/useBlock.js';
 import { AREA } from '../../model/rules.js';
-import { AccentText, CircleBtn, Glass, Kicker, Pill, PillToggle, Spinner } from '../../shared/UI.jsx';
+import { AccentText, CircleBtn, Glass, Kicker, Pill, PillToggle, Spinner, ThemeToggle, useTheme } from '../../shared/UI.jsx';
 import { fetchSatellite } from '../studio/diorama/satelliteTexture.js';
 import { boxAround, check, clampToMax, growToMin } from './areaLimits.js';
 import { hasKey, loadMaps } from './loadMaps.js';
-import { SATELLITE_STYLE, STREET_STYLE } from './mapStyles.js';
+import { SATELLITE_STYLE, STREET_STYLE, STREET_STYLE_LIGHT } from './mapStyles.js';
 import PlaceSearch from './PlaceSearch.jsx';
 
 const DELHI = { lat: 28.5704, lng: 77.2402 };   // where the map starts if location is denied
@@ -31,6 +31,7 @@ export default function ExplorePage() {
   const [mapObj, setMapObj] = useState(null);
   const [mode, setMode] = useState('browse');  // browse | draw
   const [layer, setLayer] = useState('satellite');
+  const [theme] = useTheme();
   const [info, setInfo] = useState(null);      // check(bounds) of the current box
   const [place, setPlace] = useState(null);    // { name, address } of the searched place
   const [building, setBuilding] = useState(false);
@@ -103,8 +104,9 @@ export default function ExplorePage() {
 
   useEffect(() => {
     if (!map.current) return;
-    map.current.setOptions(layer === 'satellite' ? { mapTypeId: 'hybrid', styles: SATELLITE_STYLE } : { mapTypeId: 'roadmap', styles: STREET_STYLE });
-  }, [layer, mapObj]);
+    map.current.setOptions(layer === 'satellite' ? { mapTypeId: 'hybrid', styles: SATELLITE_STYLE }
+      : { mapTypeId: 'roadmap', styles: theme === 'light' ? STREET_STYLE_LIGHT : STREET_STYLE });
+  }, [layer, mapObj, theme]);
 
   useEffect(() => {                             // Esc leaves drawing mode
     if (mode !== 'draw') return undefined;
@@ -193,7 +195,7 @@ export default function ExplorePage() {
               : <>Google said: {error}. Check that the Maps JavaScript and Places APIs are enabled for this key and that billing is on.</>}
           </p>
           <div style={{ height: 18 }} />
-          <Pill label="Try the demo block" kind="outline" onClick={() => navigate('/block/demo_lajpat')} />
+          <Pill label="Back to home" icon={ArrowLeft} kind="outline" onClick={() => navigate('/')} />
         </div>
       </div>
     );
@@ -218,6 +220,8 @@ export default function ExplorePage() {
           <CircleBtn icon={ArrowLeft} tooltip="Back" onClick={() => navigate('/')} />
           <span style={{ fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 650, letterSpacing: '-0.02em' }}>LeafIt</span>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>/ new area</span>
+          <div style={{ flex: 1 }} />
+          <ThemeToggle />
         </div>
       )}
       <div>
@@ -292,6 +296,7 @@ export default function ExplorePage() {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '10px 12px 8px', position: 'relative', zIndex: 20 }}>
             <CircleBtn icon={ArrowLeft} tooltip="Back" onClick={() => navigate('/')} />
             <div style={{ flex: 1 }}><PlaceSearch google={google} map={mapObj} onPick={onPlace} /></div>
+            <ThemeToggle />
           </div>
           <div style={{ height: '52dvh', display: 'flex', padding: '0 12px' }}>{mapCard}</div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '18px var(--gutter) 20px' }}>{panel}</div>
@@ -303,7 +308,7 @@ export default function ExplorePage() {
       <AnimatePresence>
         {building && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            style={{ position: 'absolute', inset: 0, zIndex: 40, background: 'rgba(20,24,21,0.82)', backdropFilter: 'blur(6px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18 }}>
+            style={{ position: 'absolute', inset: 0, zIndex: 40, background: 'var(--glass)', backdropFilter: 'blur(6px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18 }}>
             <Spinner />
             <AnimatePresence mode="wait">
               <motion.span key={hint} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
@@ -342,7 +347,7 @@ function AreaCard({ info }) {
   const pct = Math.min(1, info.km2 / AREA.max_km2);
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-      style={{ padding: 16, borderRadius: 18, background: 'var(--surface)', border: `1px solid ${ok ? 'var(--rule)' : 'rgba(255,138,91,0.5)'}` }}>
+      style={{ padding: 16, borderRadius: 18, background: 'var(--surface)', border: `1px solid ${ok ? 'var(--rule)' : 'color-mix(in srgb, var(--warn) 50%, transparent)'}` }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--muted)' }}>SELECTED AREA</span>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: ok ? 'var(--accent)' : 'var(--warn)' }}>{ok ? 'READY' : info.state === 'small' ? 'TOO SMALL' : 'TOO LARGE'}</span>

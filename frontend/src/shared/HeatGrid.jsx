@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { drawHeatGrid, drawPlacements, drawLandmarks, HEAT_STOPS } from './heatGrid.js';
+import { drawHeatGrid, drawPlacements, drawLandmarks, drawMask, HEAT_STOPS } from './heatGrid.js';
 import { Glass } from './UI.jsx';
 import { ZoomIn, ZoomOut, Maximize, Info } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 
 const HEAT_CSS = `linear-gradient(to right, ${HEAT_STOPS.map(([r,g,b]) => `rgb(${r},${g},${b})`).join(',')})`;
 
@@ -11,10 +10,11 @@ const HEAT_CSS = `linear-gradient(to right, ${HEAT_STOPS.map(([r,g,b]) => `rgb($
  * HeatGrid — full digital twin canvas, mirroring the Flutter HeatGrid widget.
  * Four layered canvases: heat image | placements | landmarks | ripple
  */
-export default function HeatGrid({ block, placements = [], cooling, showAfter = true, onTap, onLongPress, readOnly = false }) {
+export default function HeatGrid({ block, placements = [], cooling, showAfter = true, onTap, onLongPress, readOnly = false, isValid }) {
   const navigate = useNavigate();
   const containerRef = useRef();
   const heatRef    = useRef();
+  const maskRef    = useRef();
   const itemsRef   = useRef();
   const landRef    = useRef();
   const rippleRef  = useRef();
@@ -36,6 +36,12 @@ export default function HeatGrid({ block, placements = [], cooling, showAfter = 
     drawHeatGrid(canvas, block, cooling, showAfter);
   }, [block, cooling, showAfter]);
 
+  // Veil over cells the current tool can't use
+  useEffect(() => {
+    if (!block || !maskRef.current) return;
+    drawMask(maskRef.current, block, readOnly ? null : isValid);
+  }, [block, isValid, readOnly]);
+
   // Render placements layer
   useEffect(() => {
     if (!block || !itemsRef.current) return;
@@ -49,7 +55,6 @@ export default function HeatGrid({ block, placements = [], cooling, showAfter = 
   }, [block, zoom]);
 
   // Ripple animation on placement
-  const lastPlacement = placements[placements.length - 1];
   const [lastCell, setLastCell] = useState(null);
   const [ripplePct, setRipplePct] = useState(0);
 
@@ -92,11 +97,8 @@ export default function HeatGrid({ block, placements = [], cooling, showAfter = 
     const canvas = heatRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / zoom;
-    const y = (e.clientY - rect.top) / zoom;
-    if (x < 0 || y < 0 || x > canvas.width / zoom || y > canvas.height / zoom) return null;
-    const col = Math.floor(x / (canvas.width / zoom) * block.cols);
-    const row = Math.floor(y / (canvas.height / zoom) * block.rows);
+    const col = Math.floor((e.clientX - rect.left) / rect.width * block.cols);
+    const row = Math.floor((e.clientY - rect.top) / rect.height * block.rows);
     if (col < 0 || row < 0 || col >= block.cols || row >= block.rows) return null;
     return { row, col };
   }
@@ -113,12 +115,14 @@ export default function HeatGrid({ block, placements = [], cooling, showAfter = 
   }
 
   function handlePointerMove(e) {
+    if (!e.buttons) return;
     const dx = e.clientX - dragStart.current.x;
     const dy = e.clientY - dragStart.current.y;
     if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
       dragging.current = true;
       clearTimeout(longPressTimer.current);
     }
+    if (dragging.current) setPan(clampPan({ x: dragStart.current.px + dx, y: dragStart.current.py + dy }, zoom));
   }
 
   function handlePointerUp(e) {
@@ -133,15 +137,40 @@ export default function HeatGrid({ block, placements = [], cooling, showAfter = 
     dragging.current = false;
   }
 
-  function handleWheel(e) {
-    e.preventDefault();
-    const delta = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-    setZoom(z => Math.min(6, Math.max(1, z * delta)));
+  // Keep the zoomed map covering the viewport.
+  function clampPan(p, z) {
+    const r = containerRef.current.getBoundingClientRect();
+    return {
+      x: Math.min(0, Math.max(r.width * (1 - z), p.x)),
+      y: Math.min(0, Math.max(r.height * (1 - z), p.y)),
+    };
   }
+
+  // Zoom by `factor`, keeping the point (cx, cy) in the container fixed.
+  function zoomAt(factor, cx, cy) {
+    const z = Math.min(6, Math.max(1, zoom * factor));
+    setPan(clampPan({ x: cx - (cx - pan.x) * z / zoom, y: cy - (cy - pan.y) * z / zoom }, z));
+    setZoom(z);
+  }
+
+  // React's onWheel is passive, so preventDefault (no page scroll) needs a native listener.
+  const wheelRef = useRef();
+  wheelRef.current = (e) => {
+    e.preventDefault();
+    const r = containerRef.current.getBoundingClientRect();
+    zoomAt(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX - r.left, e.clientY - r.top);
+  };
+  useEffect(() => {
+    const el = containerRef.current;
+    const h = (e) => wheelRef.current(e);
+    el.addEventListener('wheel', h, { passive: false });
+    return () => el.removeEventListener('wheel', h);
+  }, []);
 
   function doZoom(factor) {
     if (factor === 0) { setZoom(1); setPan({ x: 0, y: 0 }); return; }
-    setZoom(z => Math.min(6, Math.max(1, z * factor)));
+    const r = containerRef.current.getBoundingClientRect();
+    zoomAt(factor, r.width / 2, r.height / 2);
   }
 
   const canvasStyle = {
@@ -154,26 +183,27 @@ export default function HeatGrid({ block, placements = [], cooling, showAfter = 
   return (
     <div
       ref={containerRef}
-      style={{ position: 'relative', width: '100%', paddingBottom: `${100 / aspect}%`, background: 'var(--sunk)', borderRadius: 'var(--radius)', overflow: 'hidden', border: '1px solid var(--rule)' }}
+      style={{ position: 'relative', width: `min(100%, ${aspect * 100}cqh)`, aspectRatio: `${size.width} / ${size.height}`, margin: '0 auto', background: 'var(--sunk)', borderRadius: 'var(--radius)', overflow: 'hidden', border: '1px solid var(--rule)' }}
     >
       <div
         style={{ position: 'absolute', inset: 0, cursor: readOnly ? 'default' : 'crosshair', touchAction: 'none' }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onWheel={handleWheel}
       >
-        <div style={{ position: 'absolute', inset: 0, transform: `scale(${zoom})`, transformOrigin: 'top left', transition: zoom === 1 ? 'transform 0.3s' : undefined }}>
+        <div style={{ position: 'absolute', inset: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'top left', transition: zoom === 1 ? 'transform 0.3s' : undefined }}>
           <canvas ref={heatRef}   width={canvasW} height={canvasH} style={canvasStyle} />
-          <canvas ref={itemsRef}  width={canvasW} height={canvasH} style={canvasStyle} />
-          <canvas ref={landRef}   width={canvasW} height={canvasH} style={canvasStyle} />
+          <canvas ref={maskRef}   width={canvasW} height={canvasH} style={canvasStyle} />
+          {/* Sprite + label layers at 4× so they stay crisp when zoomed */}
+          <canvas ref={itemsRef}  width={canvasW * 4} height={canvasH * 4} style={canvasStyle} />
+          <canvas ref={landRef}   width={canvasW * 4} height={canvasH * 4} style={canvasStyle} />
           <canvas ref={rippleRef} width={canvasW} height={canvasH} style={canvasStyle} />
         </div>
       </div>
 
       {/* Zoom controls */}
-      <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 10 }}>
-        <Glass radius={22} padding="4px 0">
+      <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}>
+        <Glass radius={18} padding="2px 0">
           {[
             { icon: ZoomIn, label: 'Zoom in', action: () => doZoom(1.6) },
             { icon: ZoomOut, label: 'Zoom out', action: () => doZoom(1 / 1.6) },
@@ -181,11 +211,11 @@ export default function HeatGrid({ block, placements = [], cooling, showAfter = 
           ].map(({ icon: Icon, label, action }, i, arr) => (
             <div key={label}>
               <button
-                title={label}
+                title={label} aria-label={label}
                 onClick={action}
-                style={{ width: 42, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--ink)' }}
+                style={{ width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--ink)' }}
               >
-                <Icon size={19} />
+                <Icon size={16} />
               </button>
               {i < arr.length - 1 && <div style={{ height: 1, background: 'var(--rule)' }} />}
             </div>
@@ -194,24 +224,22 @@ export default function HeatGrid({ block, placements = [], cooling, showAfter = 
       </div>
 
       {/* Heat legend + Estimates badge */}
-      <div style={{ position: 'absolute', bottom: 10, left: 10, right: 10, display: 'flex', gap: 8, alignItems: 'center', zIndex: 10 }}>
+      <div style={{ position: 'absolute', bottom: 8, left: 8, right: 8, display: 'flex', gap: 8, alignItems: 'center', zIndex: 10 }}>
         {block && (
-          <Glass padding="8px 12px" style={{ flex: 1, maxWidth: 280 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink)' }}>{Math.round(block.minT)}°</span>
-              <div style={{ flex: 1, height: 6, borderRadius: 3, background: HEAT_CSS }} />
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink)', whiteSpace: 'nowrap' }}>{Math.round(block.maxT)}° surface</span>
+          <Glass padding="5px 10px" style={{ flex: 1, maxWidth: 210 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink)' }}>
+              <span>{Math.round(block.minT)}°</span>
+              <div style={{ flex: 1, height: 4, borderRadius: 2, background: HEAT_CSS }} />
+              <span style={{ whiteSpace: 'nowrap' }}>{Math.round(block.maxT)}° surface</span>
             </div>
           </Glass>
         )}
-        <Glass
-          padding="8px 12px"
-          onClick={() => navigate('/assumptions')}
-          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-        >
-          <Info size={13} color="var(--ink)" />
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink)' }}>ESTIMATES</span>
-        </Glass>
+        <button onClick={() => navigate('/assumptions')} title="How the estimates work">
+          <Glass padding="5px 10px" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Info size={11} color="var(--ink)" />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink)' }}>ESTIMATES</span>
+          </Glass>
+        </button>
       </div>
     </div>
   );

@@ -38,15 +38,24 @@ def km(a, b) -> float:
     return 6371 * 2 * math.asin(math.sqrt(h))
 
 
-def find_vendors(near: tuple[float, float], categories: set[str] | None, radius_km: float) -> list[dict]:
-    out = [{**v, "distance_km": round(km(near, (v["lat"], v["lng"])), 1)} for v in VENDORS
+SEARCH_RADIUS_KM = 25
+NEAREST_FALLBACK = 3  # per category, when nothing is inside the radius
+
+
+def find_vendors(near: tuple[float, float], categories: set[str] | None, radius_km: float = SEARCH_RADIUS_KM) -> list[dict]:
+    """Vendors within `radius_km` (straight line from the area's centre). A category with nobody inside the radius
+    still gets its nearest few, flagged `beyond_radius`, so the user learns how far the closest supplier is."""
+    out = [{**v, "distance_km": round(km(near, (v["lat"], v["lng"])), 1), "beyond_radius": False} for v in VENDORS
            if not categories or v["category"] in categories]
-    out = [v for v in out if v["distance_km"] <= radius_km]
-    return sorted(out, key=lambda v: (v["distance_km"] - v["rating"]))  # ponytail: naive rank, 1★ ≈ 1 km
+    inside = [v for v in out if v["distance_km"] <= radius_km]
+    for cat in {v["category"] for v in out} - {v["category"] for v in inside}:
+        far = sorted((v for v in out if v["category"] == cat), key=lambda v: v["distance_km"])[:NEAREST_FALLBACK]
+        inside += [{**v, "beyond_radius": True} for v in far]
+    return sorted(inside, key=lambda v: (v["beyond_radius"], v["distance_km"] - v["rating"]))  # ponytail: naive rank, 1★ ≈ 1 km
 
 
 def quote_links(plan: dict, block: Block, items: list[dict], vendor: dict) -> dict:
-    lines = [f"Hello {vendor['name']},", f"LeafIt quote request for {block.meta['name']} (plan {plan['id']}):"]
+    lines = [f"Hello {vendor['name'].removesuffix(' (demo)')},", f"LeafIt quote request for {block.meta['name']} (plan {plan['id']}):"]
     lines += [f"• {i['item']}: {i['quantity']:,} {i['unit']}" for i in items if i["category"] == vendor["category"]]
     lines.append("Please share your quote and earliest start date. Thank you.")
     text = "\n".join(lines)

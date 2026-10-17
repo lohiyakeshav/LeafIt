@@ -181,7 +181,10 @@ assert api.get(f"/plans/{pid}").json()["name"] == "Untitled plan"  # blank name 
 assert api.get(f"/plans/{pid}").json()["metrics"]["total_cost_inr"] == m(mix)["total_cost_inr"]
 bom = {i["type"]: i for i in api.get(f"/plans/{pid}/bom").json()}
 assert bom["tree"]["quantity"] == 3 and bom["shade_stop"]["quantity"] == 1
-assert api.get("/plans/../etc").status_code == 404 and api.get("/plans/nope").status_code == 404
+# traversal is refused by the store itself; over HTTP "/plans/../etc" normalises to "/etc", which the web app may serve
+assert store.load_plan("../etc") is None and store.load_plan("..%2Fetc") is None
+assert api.get("/plans/nope").status_code == 404
+assert not api.get("/plans/../etc").headers.get("content-type", "").startswith("application/json")
 vs = api.get("/vendors", params={"block_id": "demo_lajpat", "category": "nursery"}).json()
 assert vs and all(v["category"] == "nursery" for v in vs)
 q = api.post("/quotes", json={"plan_id": pid, "vendor_id": vs[0]["id"]}).json()
@@ -322,3 +325,11 @@ healed = api.get(f"/areas/{syn['id']}")
 assert healed.json()["synthetic"] is False and "immutable" in healed.headers["cache-control"]
 assert api.post("/areas", json=other).json()["cached"] is True                          # real data IS cached from here on
 print("areas: limits, grid, footprints, pipeline, API, synthetic fallback and agent-on-area all OK")
+
+# vendors: nothing inside the radius -> the nearest few come back, flagged, nearest first
+far = market.find_vendors((19.07, 72.87), {"nursery"}, 25)   # Mumbai: every Delhi nursery is far away
+assert far and all(v["beyond_radius"] for v in far) and len(far) <= market.NEAREST_FALLBACK
+assert far == sorted(far, key=lambda v: v["distance_km"] - v["rating"]) and far[0]["distance_km"] > 25
+near = market.find_vendors(market.center(store.get_block("demo_lajpat")), {"nursery"}, 25)
+assert near and not any(v["beyond_radius"] for v in near)
+print("vendors: 25 km radius and nearest-beyond fallback OK")

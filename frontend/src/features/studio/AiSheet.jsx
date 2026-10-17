@@ -294,7 +294,7 @@ function ScenarioCard({ sc, chosen }) {
   const m = sc.metrics ?? {};
   return (
     <motion.div
-      animate={{ borderColor: chosen ? 'var(--accent)' : 'var(--rule)', background: chosen ? 'rgba(158,227,95,0.08)' : 'transparent' }}
+      animate={{ borderColor: chosen ? 'var(--accent)' : 'var(--rule)', background: chosen ? 'var(--accent-soft)' : 'rgba(0,0,0,0)' }}
       style={{ borderRadius: 18, border: '1px solid var(--rule)', padding: 16, marginBottom: 10, transition: 'all 0.45s' }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>

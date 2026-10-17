@@ -44,6 +44,10 @@
   --cool:        #7FD6FF;
   --warn:        #FF8A5B;
   --paper:       #F2EFE6;
+  --glass:       rgba(20,24,21,0.72);   /* floating controls over the map */
+  --accent-soft: rgba(158,227,95,0.12); /* selected-card wash */
+  --shadow:      0 4px 24px rgba(0,0,0,0.4);
+  color-scheme: dark;
 
   --gutter: 20px;
   --radius: 22px;
@@ -53,6 +57,33 @@
   --font-mono: 'GeistMono', 'Courier New', monospace;
   --font-serif: 'InstrumentSerif', Georgia, serif;
   --font-hand: 'Caveat', cursive;
+}
+
+/* Light theme: same names, daylight values. The accent darkens so green text keeps 4.5:1 contrast on the page,
+   and filled accent buttons switch to white text. Chosen via the toggle (localStorage) or the system setting. */
+:root[data-theme="light"] {
+  --page:        #F4F2EB;
+  --surface:     #FFFFFF;
+  --surface-hi:  #ECE9E0;
+  --sunk:        #E6E3D9;
+  --ink:         #141815;
+  --ink-soft:    rgba(20,24,21,0.76);
+  --muted:       #5B6357;
+  --rule:        rgba(20,24,21,0.14);
+  --accent:      #2F7A17;
+  --on-accent:   #FFFFFF;
+  --cool:        #0B6E99;
+  --warn:        #C2410C;
+  --glass:       rgba(255,255,255,0.82);
+  --accent-soft: rgba(47,122,23,0.10);
+  --shadow:      0 4px 24px rgba(20,24,21,0.16);
+  color-scheme: light;
+}
+
+/* Theme switch: colours ease instead of snapping */
+body, body * { transition-property: background-color, border-color, color, fill, stroke; transition-duration: 0.25s; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -97,3 +128,22 @@ hr {
   outline-offset: 2px;
   border-radius: 4px;
 }
+
+/* Visible to screen readers only */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Print / Save as PDF: paper colours whatever the theme, no controls, no animation offsets */
+@media print {
+  :root, :root[data-theme] {
+    --page: #FFFFFF; --surface: #FFFFFF; --surface-hi: #F4F2EB; --sunk: #F4F2EB;
+    --ink: #141815; --ink-soft: rgba(20,24,21,0.8); --muted: #5B6357; --rule: rgba(20,24,21,0.18);
+    --accent: #2F7A17; --on-accent: #FFFFFF; --cool: #0B6E99; --warn: #C2410C; --glass: #FFFFFF;
+    color-scheme: light;
+  }
+  [data-noprint], button, [role="status"] { display: none !important; }
+  body, body * { transition: none !important; }
+  * { transform: none !important; opacity: 1 !important; }
+  section, figure, table { break-inside: avoid; }
+}
+
+kbd { font-family: var(--font-mono); font-size: 0.92em; padding: 1px 5px; border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 5px; color: var(--ink); }

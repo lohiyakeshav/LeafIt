@@ -113,44 +113,124 @@ export function drawHeatGrid(canvas, rawBlock, cooling, showAfter) {
   return off; // caller can cache this for compare slider
 }
 
+// Pixel-art sprites, one char per pixel ('.' = transparent).
+const PALETTE = { k: '#141815', d: '#2F6B2A', g: '#5BAE3A', l: '#9EE35F', t: '#7A4A23', c: '#7FD6FF', w: '#E8EDE3', h: '#FFFFFF', s: '#B9C8D0' };
+const SPRITES = {
+  tree: [
+    '....kkkkk...',
+    '..kkllgggkk.',
+    '.klllggggdk.',
+    'kllgggggggdk',
+    'klggggggdgdk',
+    'kgggggggggdk',
+    'kggdggggdddk',
+    '.kgggggdddk.',
+    '..kkddddkk..',
+    '....kttk....',
+    '....kttk....',
+    '...kkttkk...',
+  ],
+  // Reflective white roof slab with a sun glint; no outline so neighbouring roofs join up.
+  cool_roof: [
+    'hhhwwwwwws',
+    'hhwwwwwwws',
+    'hwwwwwwwws',
+    'wwwwwcwwws',
+    'wwwwwwwwws',
+    'wwwwwwwwws',
+    'wcwwwwwwws',
+    'wwwwwwwwws',
+    'wwwwwwwwws',
+    'ssssssssss',
+  ],
+  shade_stop: [
+    'kkkkkkkkkkkk',
+    'kcccccccccck',
+    'kkkkkkkkkkkk',
+    '.kk......kk.',
+    '.kk......kk.',
+    '.kkwwwwwwkk.',
+    '.kkkkkkkkkk.',
+    '.kk.k..k.kk.',
+  ],
+};
+
+const spriteCache = {};
+function sprite(name) {
+  if (spriteCache[name]) return spriteCache[name];
+  const rows = SPRITES[name];
+  const off = document.createElement('canvas');
+  off.width = rows[0].length;
+  off.height = rows.length;
+  const ctx = off.getContext('2d');
+  rows.forEach((line, y) => [...line].forEach((ch, x) => {
+    if (PALETTE[ch]) { ctx.fillStyle = PALETTE[ch]; ctx.fillRect(x, y, 1, 1); }
+  }));
+  return (spriteCache[name] = off);
+}
+
 /** Draw placement icons on canvas */
 export function drawPlacements(canvas, block, placements) {
   if (!canvas || !block) return;
   const { rows, cols } = block;
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.imageSmoothingEnabled = false;
 
   const cw = canvas.width / cols;
   const ch = canvas.height / rows;
   const unit = Math.min(cw, ch);
 
-  for (const p of placements) {
+  // Back rows first so nearer sprites overlap the ones behind.
+  for (const p of [...placements].sort((a, b) => a.row - b.row)) {
     const x = p.col * cw + cw / 2;
     const y = p.row * ch + ch / 2;
 
     if (p.type === 'tree') {
-      const rad = unit * Math.min(0.5, 0.28 + 0.03 * p.count);
-      ctx.beginPath();
-      ctx.arc(x, y, rad, 0, Math.PI * 2);
-      ctx.fillStyle = '#9EE35F';
-      ctx.fill();
-      ctx.strokeStyle = '#141815';
-      ctx.lineWidth = Math.max(1, unit * 0.1);
-      ctx.stroke();
+      // Crown spills past its 10 m cell; trunk stands on the cell's bottom edge.
+      const s = unit * Math.min(1.8, 1.2 + 0.06 * p.count);
+      ctx.drawImage(sprite('tree'), x - s / 2, y + ch / 2 - s, s, s);
+      if (p.count > 1) {
+        const r = unit * 0.34, bx = x + s * 0.42, by = y + ch / 2 - s * 0.9;
+        ctx.beginPath();
+        ctx.arc(bx, by, r, 0, Math.PI * 2);
+        ctx.fillStyle = '#141815';
+        ctx.fill();
+        ctx.fillStyle = '#E8EDE3';
+        ctx.font = `600 ${r * 1.3}px GeistMono, monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(p.count, bx, by);
+      }
     } else if (p.type === 'cool_roof') {
-      ctx.strokeStyle = '#E8EDE3';
-      ctx.lineWidth = Math.max(1.2, unit * 0.12);
-      const inset = unit * 0.14;
-      ctx.strokeRect(p.col * cw + inset, p.row * ch + inset, cw - 2 * inset, ch - 2 * inset);
+      ctx.drawImage(sprite('cool_roof'), p.col * cw, p.row * ch, cw, ch);
     } else if (p.type === 'shade_stop') {
-      const inset = unit * 0.15;
-      ctx.fillStyle = '#7FD6FF';
-      ctx.fillRect(p.col * cw + inset, p.row * ch + inset, cw - 2 * inset, ch - 2 * inset);
-      ctx.strokeStyle = '#141815';
-      ctx.lineWidth = Math.max(1, unit * 0.1);
-      ctx.strokeRect(p.col * cw + inset, p.row * ch + inset, cw - 2 * inset, ch - 2 * inset);
+      const s = unit * 1.2;
+      ctx.drawImage(sprite('shade_stop'), x - s / 2, y + ch / 2 - s * 8 / 12, s, s * 8 / 12);
     }
   }
+}
+
+/** Dim every cell where the current tool can't go, so valid spots stand out. */
+export function drawMask(canvas, block, isValid) {
+  if (!canvas || !block) return;
+  const { rows, cols } = block;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!isValid) return;
+  const off = document.createElement('canvas');
+  off.width = cols;
+  off.height = rows;
+  const octx = off.getContext('2d');
+  const img = octx.createImageData(cols, rows);
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (!isValid(r, c)) img.data[(r * cols + c) * 4 + 3] = 150; // rgb stays 0 → dark veil
+    }
+  }
+  octx.putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(off, 0, 0, canvas.width, canvas.height);
 }
 
 /** Draw landmark labels */
@@ -183,7 +263,7 @@ export function drawLandmarks(canvas, block, zoom = 1) {
 
     // label pill
     const gap = Math.max(6, unit * 0.9) / zoom;
-    const padX = 6 / zoom, padY = 3 / zoom;
+    const padX = unit * 0.6 / zoom, padY = unit * 0.3 / zoom;
     const textW = ctx.measureText(l.name).width;
     const boxW = textW + 2 * padX;
     const boxH = fontSize + 2 * padY;

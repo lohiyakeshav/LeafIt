@@ -18,7 +18,7 @@ export function Reveal({ children, delay = 0, dy = 14, duration = 0.7, className
 }
 
 // ── PulseDot ─────────────────────────────────────────────────────────────────
-export function PulseDot({ color = '#9EE35F', size = 7 }) {
+export function PulseDot({ color = 'var(--accent)', size = 7 }) {
   return (
     <span style={{ position: 'relative', display: 'inline-block', width: size, height: size }}>
       <motion.span
@@ -61,6 +61,8 @@ export function Pill({ label, icon: Icon, onClick, kind = 'solid', loading = fal
   return (
     <motion.button
       onClick={disabled || loading ? undefined : onClick}
+      disabled={disabled}
+      aria-busy={loading || undefined}
       whileTap={!disabled && !loading ? { scale: 0.96 } : {}}
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: dense ? 6 : 8,
@@ -88,6 +90,9 @@ export function CircleBtn({ icon: Icon, tooltip, onClick, filled = false, disabl
   return (
     <motion.button
       title={tooltip}
+      aria-label={tooltip}
+      aria-pressed={filled || undefined}
+      disabled={disabled}
       onClick={disabled ? undefined : onClick}
       whileTap={!disabled ? { scale: 0.9 } : {}}
       style={{
@@ -100,7 +105,7 @@ export function CircleBtn({ icon: Icon, tooltip, onClick, filled = false, disabl
         cursor: disabled ? 'default' : 'pointer',
       }}
     >
-      {Icon && <Icon size={18} />}
+      {Icon && <Icon size={18} aria-hidden="true" />}
     </motion.button>
   );
 }
@@ -109,7 +114,7 @@ export function CircleBtn({ icon: Icon, tooltip, onClick, filled = false, disabl
 export function PillToggle({ options, value, onChange, dense = false, expand = false, bare = false }) {
   const h = dense ? 34 : 44;
   return (
-    <div style={{
+    <div role="group" style={{
       display: 'flex', height: h, padding: 3,
       background: bare ? 'transparent' : 'var(--sunk)',
       border: bare ? 'none' : '1px solid var(--rule)',
@@ -121,6 +126,7 @@ export function PillToggle({ options, value, onChange, dense = false, expand = f
           <motion.button
             key={v}
             onClick={() => onChange(v)}
+            aria-pressed={active}
             style={{
               flex: expand ? 1 : undefined,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
@@ -195,7 +201,7 @@ export function Glass({ children, radius = 999, padding = '0', style = {} }) {
     <div style={{
       backdropFilter: 'blur(14px)',
       WebkitBackdropFilter: 'blur(14px)',
-      background: 'rgba(20,24,21,0.72)',
+      background: 'var(--glass)',
       border: '1px solid var(--rule)',
       borderRadius: radius,
       padding,
@@ -360,8 +366,8 @@ export function Marquee({ words = [], size = 44, seconds = 38 }) {
                 fontFamily: 'var(--font-serif)',
                 fontSize: size,
                 fontStyle: i % 2 === 1 ? 'italic' : 'normal',
-                color: i % 2 === 1 ? 'rgba(232,237,227,0.7)' : 'rgba(232,237,227,0.85)',
-                WebkitTextStroke: i % 2 === 1 ? '1px rgba(232,237,227,0.7)' : undefined,
+                color: i % 2 === 1 ? 'var(--ink-soft)' : 'var(--ink)', opacity: i % 2 === 1 ? 0.8 : 0.85,
+                WebkitTextStroke: i % 2 === 1 ? '1px var(--ink-soft)' : undefined,
                 WebkitTextFillColor: i % 2 === 1 ? 'transparent' : undefined,
                 marginRight: 24,
               }}
@@ -399,11 +405,11 @@ export function ToastProvider() {
       }}
     >
       {toast && (
-        <div style={{
+        <div role="status" aria-live="polite" style={{
           background: 'var(--ink)', color: 'var(--page)',
           fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500,
           padding: '10px 20px', borderRadius: 999,
-          boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
+          boxShadow: 'var(--shadow)',
           whiteSpace: 'nowrap',
         }}>
           {toast.msg}
@@ -443,7 +449,7 @@ export function InfoLabel({ label, onInfo }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
       <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
-      <button onClick={onInfo} style={{ cursor: 'pointer', color: 'var(--muted)', lineHeight: 0, padding: 2, borderRadius: 4 }} title={`How is ${label} calculated?`}>
+      <button onClick={(e) => { e.stopPropagation(); onInfo?.(); }} style={{ cursor: 'pointer', color: 'var(--muted)', lineHeight: 0, padding: 4, borderRadius: 4 }} title={`How is ${label} calculated?`} aria-label={`How is ${label.toLowerCase()} calculated?`}>
         <InfoIcon size={12} />
       </button>
     </div>
@@ -462,6 +468,61 @@ function InfoIcon({ size = 14 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+    </svg>
+  );
+}
+
+// ── Theme ──────────────────────────────────────────────────────────────────────
+// index.html sets data-theme before first paint; this hook flips it and remembers the choice.
+export function useTheme() {
+  const [theme, setTheme] = useState(() => document.documentElement.dataset.theme || 'dark');
+  const toggle = useCallback(() => {
+    const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('leafit-theme', next); } catch { /* private mode: still switches for this visit */ }
+    window.dispatchEvent(new Event('leafit-theme'));
+    setTheme(next);
+  }, []);
+  useEffect(() => {   // keep every toggle on the page in sync
+    const on = () => setTheme(document.documentElement.dataset.theme);
+    window.addEventListener('leafit-theme', on);
+    return () => window.removeEventListener('leafit-theme', on);
+  }, []);
+  return [theme, toggle];
+}
+
+export function ThemeToggle() {
+  const [theme, toggle] = useTheme();
+  const light = theme === 'light';
+  return (
+    <motion.button
+      onClick={toggle}
+      whileTap={{ scale: 0.9 }}
+      aria-label={light ? 'Switch to dark theme' : 'Switch to light theme'}
+      title={light ? 'Dark theme' : 'Light theme'}
+      style={{
+        width: 40, height: 40, borderRadius: '50%', border: '1px solid var(--rule)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink)', flexShrink: 0,
+      }}
+    >
+      <motion.span key={theme} initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} transition={{ duration: 0.3 }} style={{ display: 'flex' }}>
+        {light ? <Moon size={17} /> : <Sun size={17} />}
+      </motion.span>
+    </motion.button>
+  );
+}
+
+function Sun({ size }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </svg>
+  );
+}
+function Moon({ size }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
     </svg>
   );
 }

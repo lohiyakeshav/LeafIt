@@ -8,7 +8,7 @@ router = APIRouter(tags=["vendors"])
 
 
 @router.get("/vendors")
-def vendors(block_id: str, category: str | None = None, radius_km: float = 15):
+def vendors(block_id: str, category: str | None = None, radius_km: float = market.SEARCH_RADIUS_KM):
     cats = set(category.split(",")) if category else None
     return market.find_vendors(market.center(block_or_404(block_id)), cats, radius_km)
 

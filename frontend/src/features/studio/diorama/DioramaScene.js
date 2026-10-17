@@ -65,7 +65,10 @@ const TREE_VERT = `
     vec4 c = modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
     float sc = length(instanceMatrix[0].xyz) * uHeight;
     vec3 right = normalize(vec3(viewMatrix[0][0], 0.0, viewMatrix[2][0]));   // face the camera around the vertical axis only
-    vec3 pos = c.xyz + right * position.x * sc * 0.73 + vec3(0.0, 1.0, 0.0) * position.y * sc;
+    // Looking down from overhead an upright card is seen edge-on and vanishes, so it leans back towards the camera.
+    float lean = smoothstep(0.55, 0.95, viewMatrix[1][2]);                    // 0 = side view, 1 = straight down
+    vec3 up = normalize(mix(vec3(0.0, 1.0, 0.0), vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]), lean));
+    vec3 pos = c.xyz + right * position.x * sc * 0.73 + up * position.y * sc + vec3(0.0, lean * 1.5, 0.0);
     vUv = uv; vVar = aVariant;
     gl_Position = projectionMatrix * viewMatrix * vec4(pos, 1.0);
   }`;
@@ -432,7 +435,7 @@ export class DioramaScene {
     const grown = (0.4 + 0.6 * maturity(years)) * ex;
     const m = new THREE.Matrix4(), q = new THREE.Quaternion();
     let nt = 0, ns = 0;
-    const coatedCells = new Set();
+    const coatedIds = new Set(), coatedCells = new Set();   // tapped roofs carry their building id; AI plans only have cells
     this.pickables = [];                       // trees and stops, for screen-space erase picking
     for (const it of items) {
       if (it.type === 'tree' && nt < MAX_ITEMS) {
@@ -447,14 +450,18 @@ export class DioramaScene {
         m.compose(new THREE.Vector3(it.x, 0, it.z), q, new THREE.Vector3(ex, ex, ex));
         this.stops.mesh.setMatrixAt(ns, m); this.stops.posts.setMatrixAt(ns, m); ns++;
         this.pickables.push({ id: it.id, x: it.x, y: 2.5, z: it.z });
-      } else if (it.type === 'cool_roof') for (const [r, c] of it.cells) coatedCells.add(r * this.grid.cols + c);
+      } else if (it.type === 'cool_roof') {
+        if (it.buildingId != null) coatedIds.add(it.buildingId);
+        else for (const [r, c] of it.cells) coatedCells.add(r * this.grid.cols + c);
+      }
     }
     this.trees.mesh.count = this.trees.shadow.count = nt;
     this.stops.mesh.count = this.stops.posts.count = ns;
     for (const o of [this.trees.mesh, this.trees.shadow, this.stops.mesh, this.stops.posts]) o.instanceMatrix.needsUpdate = true;
     this.trees.mesh.geometry.getAttribute('aVariant').needsUpdate = true;
-    this.buildings.forEach((b, i) => {      // a building is coated if any cell the model coats lies under it
-      const coated = b.cells.some(([r, c]) => coatedCells.has(r * this.grid.cols + c)) ? 1 : 0;
+    // Only the roof that was tapped lights up. Row houses share 10 m cells, so matching by cell would also coat the neighbours.
+    this.buildings.forEach((b, i) => {
+      const coated = coatedIds.has(b.id) || b.cells.some(([r, c]) => coatedCells.has(r * this.grid.cols + c)) ? 1 : 0;
       if (coated !== this.bCoated[i]) { this.bCoated[i] = coated; this._setRoof(i, this._roofTint(i)); }
     });
     this.requestRender();
@@ -550,12 +557,14 @@ export class DioramaScene {
       const { origin, dir } = area(e);
       let building = null, x, z;
       const g = groundHit(origin, dir);
-      if (this.tool === 'cool_roof' || this.tool === 'erase') building = pickBuilding(this.index, this.buildings, origin, dir, this.maxHeight);
+      const hit = pickBuilding(this.index, this.buildings, origin, dir, this.maxHeight);
+      if (this.tool === 'cool_roof' || this.tool === 'erase') building = hit;
       if (building !== null) { const b = this.buildings[building]; x = b.poly.reduce((s, p) => s + p[0], 0) / b.poly.length; z = b.poly.reduce((s, p) => s + p[1], 0) / b.poly.length; }
       else if (g) ({ x, z } = g);
       else return null;
       const inside = x >= 0 && z >= 0 && x <= this.W && z <= this.D;
-      return inside ? { x, z, building: building === null ? null : this.buildings[building], buildingIndex: building } : null;
+      // onRoof: the pointer is over a building, so a tree or bus stop would land on the hidden ground behind it
+      return inside ? { x, z, building: building === null ? null : this.buildings[building], buildingIndex: building, onRoof: hit !== null } : null;
     };
     el.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;

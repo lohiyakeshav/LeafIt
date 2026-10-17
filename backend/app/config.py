@@ -4,6 +4,14 @@ import os
 from pathlib import Path
 
 ROOT = Path(__file__).parents[2]
+
+# Local dev: read backend/.env (git-ignored) if present. Real environment variables win, so Cloud Run is unaffected.
+_env = Path(__file__).parents[1] / ".env"
+if _env.exists():
+    for _line in _env.read_text().splitlines():
+        _k, _sep, _v = _line.partition("=")
+        if _sep and _k.strip() and not _k.lstrip().startswith("#") and _v.strip():
+            os.environ.setdefault(_k.strip(), _v.strip().strip('"\''))
 MODEL = json.loads(Path(os.environ.get("LEAFIT_MODEL_JSON", ROOT / "shared/model.json")).read_text())
 
 BLOCKS_DIR = Path(__file__).parents[1] / "data/blocks"
