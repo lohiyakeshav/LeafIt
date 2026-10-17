@@ -6,12 +6,12 @@ import numpy as np
 import pytest
 
 from app import config
+from app.api.deps import block_repository
 from app.domain.area.buildings import coverage
 from app.domain.area.grid import Bounds, area_id, classify, make_grid, validate
 from app.domain.sim import simulate
 from app.integrations import conditions, earthengine, places
 from app.services import area_builder
-from app.storage.store import store
 
 
 def box(lat, lng, w_m, h_m):
@@ -103,8 +103,8 @@ def test_pipeline_assembles_a_real_block(fake_earth):
     assert area["synthetic"] is False and area["source"] == "earth_engine" and area["baseline_aqi"] == 212
     assert (area["rows"], area["cols"]) == (40, 60) and len(area["buildings"]) == 5 and area["buildings"][0]["height_m"] == 12.0
     assert max(map(max, area["building_frac"])) == 1.0 and area["landcover"][10][4] == 0 and area["landcover"][0][0] == 1
-    store.put_area(area)
-    block = store.get_block(area["id"])
+    block_repository.save_area(area)
+    block = block_repository.get_block(area["id"])
     out = simulate(block, [{"type": "tree", "row": 0, "col": 0}, {"type": "cool_roof", "row": 10, "col": 4}], 10)
     assert out["metrics"]["total_cost_inr"] == 3000 + round(float(block.roof_area[10, 4]) * 250) and len(out["cooling_grid"]) == 40
 

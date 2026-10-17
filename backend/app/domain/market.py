@@ -1,4 +1,4 @@
-"""Bill of materials, vendors and quote links (PRD §10). Pure logic: the vendor list and plans come from app/storage."""
+"""Bill of materials, vendors and quote links (PRD §10). Pure logic: the vendor list and plans come from app/repositories."""
 import math
 from urllib.parse import quote
 

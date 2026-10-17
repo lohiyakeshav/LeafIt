@@ -1,17 +1,17 @@
 """Vendors (search radius and nearest-beyond fallback) and money in the reader's currency."""
 from app.agents.proposal import money, with_money
+from app.api.deps import vendor_repository
 from app.domain import market
-from app.storage.store import store
 
 
 def test_nothing_in_radius_returns_the_nearest_few_flagged():
-    far = market.find_vendors(store.vendors(), (19.07, 72.87), {"nursery"}, 25)   # Mumbai: every sample nursery is in Delhi
+    far = market.find_vendors(vendor_repository.list_vendors(), (19.07, 72.87), {"nursery"}, 25)   # Mumbai: every sample nursery is in Delhi
     assert far and all(v["beyond_radius"] for v in far) and len(far) <= market.NEAREST_FALLBACK
     assert far[0]["distance_km"] > 25
 
 
 def test_vendors_inside_radius_are_not_flagged(block):
-    near = market.find_vendors(store.vendors(), market.center(block), {"nursery"}, 25)
+    near = market.find_vendors(vendor_repository.list_vendors(), market.center(block), {"nursery"}, 25)
     assert near and not any(v["beyond_radius"] for v in near)
 
 

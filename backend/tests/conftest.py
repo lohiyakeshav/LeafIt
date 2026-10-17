@@ -8,10 +8,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import config
+from app.api.deps import block_repository, plan_repository
 from app.domain.sim import simulate
 from app.integrations import gemini
 from app.main import app
-from app.storage.store import store
 
 
 @pytest.fixture(autouse=True)
@@ -21,9 +21,9 @@ def offline(monkeypatch, tmp_path):
     monkeypatch.setattr(gemini, "_client", None)
     monkeypatch.setattr(config, "GOOGLE_MAPS_SERVER_KEY", None)
     monkeypatch.setattr(config, "ALLOW_SYNTHETIC_AREAS", False)
-    monkeypatch.setattr(store, "plans_dir", tmp_path / "plans")
-    monkeypatch.setattr(store, "areas_dir", tmp_path / "areas")
-    monkeypatch.setattr(store, "_cache", {})   # areas built by one test must not leak into the next
+    monkeypatch.setattr(plan_repository, "plans_dir", tmp_path / "plans")
+    monkeypatch.setattr(block_repository, "areas_dir", tmp_path / "areas")
+    monkeypatch.setattr(block_repository, "_cache", {})   # areas built by one test must not leak into the next
 
 
 @pytest.fixture
@@ -34,7 +34,7 @@ def api():
 @pytest.fixture(scope="session")
 def block():
     """The shipped 600 × 600 m sample block: the fixture every simulator test runs on."""
-    return store.get_block("demo_lajpat")
+    return block_repository.get_block("demo_lajpat")
 
 
 class Cells:

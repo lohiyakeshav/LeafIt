@@ -6,8 +6,8 @@ ARCHITECTURE.md
 backend/README.md
 frontend/README.md
 
-# Legacy Flutter app (superseded by the web app in frontend/)
-/app/
+# Flutter app build output (its own flutter_app/.gitignore covers the rest)
+flutter_app/build/
 
 # Python
 .venv/

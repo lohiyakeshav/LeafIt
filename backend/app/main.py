@@ -5,10 +5,9 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api import errors
+from app.api import deps, errors
 from app.api.routes import ALL
 from app.config import WEB_DIR
-from app.storage.store import store
 
 
 class SPAFiles(StaticFiles):
@@ -30,7 +29,7 @@ def create_app() -> FastAPI:
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
     for router in ALL:
         app.include_router(router)
-    store.purge_expired()  # expired plans and areas go at start-up (and hourly while saving)
+    deps.purge_expired()  # expired plans and areas go at start-up (and hourly while saving)
     if WEB_DIR.is_dir():  # registered last so API routes win
         app.mount("/", SPAFiles(directory=WEB_DIR, html=True), name="web")
     return app

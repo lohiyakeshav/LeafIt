@@ -20,7 +20,8 @@ New to the code? Read **[ARCHITECTURE.md](ARCHITECTURE.md)**: how the pieces fit
 
 ```
 shared/      model.json (the model's numbers and rules, read by both simulators) + golden fixtures
-backend/     FastAPI: api/ → services/ → domain/, agents/, integrations/, storage/
+backend/     FastAPI: api/routes → services/ → repositories/ (+ domain/, agents/, integrations/)
+flutter_app/ Flutter mobile client (talks to the same API)
 frontend/    React: app/, features/ (one per page), model/ (simulator), shared/ (ui, layout, metrics, lib), state/, api/
 ```
 
@@ -79,7 +80,7 @@ docker build --build-arg VITE_GOOGLE_MAPS_API_KEY=<browser key> -t leafit .
 docker run -p 8080:8080 -e GEMINI_API_KEY=... -e EE_PROJECT=... leafit
 ```
 
-One container serves the API and the built web app. On Cloud Run, do not ship a key file: attach a service account (with the two Earth Engine roles above) to the service. Built areas are cached on local disk, which Cloud Run loses on restart; move `backend/app/storage/store.py` to Firestore or GCS when that matters.
+One container serves the API and the built web app. On Cloud Run, do not ship a key file: attach a service account (with the two Earth Engine roles above) to the service. Built areas are cached on local disk, which Cloud Run loses on restart; re-implement `backend/app/repositories/` on Firestore or GCS when that matters.
 
 ## Known limits
 

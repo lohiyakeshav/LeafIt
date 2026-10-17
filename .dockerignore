@@ -3,7 +3,7 @@ backend/data/areas
 backend/data/fx
 **/.venv
 **/__pycache__
-app/*
+flutter_app
 docs
 .git
 # never bake secrets or local build output into an image

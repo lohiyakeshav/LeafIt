@@ -1,7 +1,11 @@
-"""Turn Pydantic validation errors into one plain sentence for the user; never leak internals."""
+"""Error responses: service errors map to HTTP statuses, and Pydantic validation errors become one plain sentence."""
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+
+from app.services.errors import InvalidInputError, NotFoundError, ServiceError, UnavailableError
+
+STATUS = {NotFoundError: 404, InvalidInputError: 422, UnavailableError: 503}
 
 _LABELS = {"budget_inr": "Budget", "brief": "Your brief", "name": "Plan name", "years": "Years",
            "placements": "The plan", "block_id": "Block",
@@ -41,3 +45,7 @@ def install(app: FastAPI) -> None:
     async def _validation_error(_: Request, exc: RequestValidationError):
         errors = exc.errors()
         return JSONResponse(status_code=422, content={"detail": readable(errors[0]) if errors else "Please check your input."})
+
+    @app.exception_handler(ServiceError)
+    async def _service_error(_: Request, exc: ServiceError):
+        return JSONResponse(status_code=STATUS.get(type(exc), 500), content={"detail": str(exc)})

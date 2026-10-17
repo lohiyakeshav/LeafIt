@@ -3,7 +3,7 @@
 backend/data/plans
 backend/data/areas
 backend/data/fx
-app/*
+flutter_app
 docs
 .git
 # `gcloud ... --source .` uploads everything not listed here: keep secrets and local build output out of it

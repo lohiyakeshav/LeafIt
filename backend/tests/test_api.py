@@ -51,8 +51,8 @@ def test_plan_bom_vendors_quote_proposal(api, cells):
 
 
 def test_plan_ids_cannot_escape_the_store(api):
-    from app.storage.store import store
-    assert store.load_plan("../etc") is None and store.load_plan("..%2Fetc") is None
+    from app.api.deps import plan_repository
+    assert plan_repository.get_plan("../etc") is None and plan_repository.get_plan("..%2Fetc") is None
     assert api.get("/plans/nope").status_code == 404
     # over HTTP "/plans/../etc" normalises to "/etc": the web app may answer, the plan store never does
     assert not api.get("/plans/../etc").headers.get("content-type", "").startswith("application/json")
@@ -63,15 +63,15 @@ def test_old_plans_and_areas_expire(api, tmp_path):
     import time
 
     from app import config
-    from app.storage.store import store
+    from app.api.deps import block_repository, plan_repository, purge_expired
     pid = api.post("/plans", json={"block_id": "demo_lajpat", "placements": []}).json()["id"]
     fresh = api.post("/plans", json={"block_id": "demo_lajpat", "placements": []}).json()["id"]
-    (store.areas_dir).mkdir(parents=True, exist_ok=True)
-    old_area = store.areas_dir / "a_000000000000.json"
+    block_repository.areas_dir.mkdir(parents=True, exist_ok=True)
+    old_area = block_repository.areas_dir / "a_000000000000.json"
     old_area.write_text("{}")
     long_ago = time.time() - (max(config.PLAN_TTL_DAYS, config.AREA_TTL_DAYS) + 1) * 86_400
-    for f in (store.plans_dir / f"{pid}.json", old_area):
+    for f in (plan_repository.plans_dir / f"{pid}.json", old_area):
         os.utime(f, (long_ago, long_ago))
-    assert store.purge_expired() == 2
+    assert purge_expired() == 2
     assert api.get(f"/plans/{pid}").status_code == 404 and api.get(f"/plans/{fresh}").status_code == 200
-    assert not old_area.exists() and store.get_block("demo_lajpat")      # shipped sample blocks are never touched
+    assert not old_area.exists() and block_repository.get_block("demo_lajpat")      # shipped sample blocks are never touched
