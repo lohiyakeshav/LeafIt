@@ -9,7 +9,7 @@ class BlockService:
         self.blocks = blocks
 
     def list_blocks(self) -> list[dict]:
-        return [{k: b.meta[k] for k in ("id", "name", "origin", "synthetic") if k in b.meta}
+        return [{k: b.meta[k] for k in ("id", "name", "origin", "sample") if k in b.meta}
                 for b in self.blocks.list_demo_blocks()]
 
     def get_block(self, block_id: str) -> str:

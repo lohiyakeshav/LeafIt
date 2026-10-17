@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from app.config import ROOT
-from app.domain.sim import ASSUMPTIONS, maturity, simulate
+from app.domain.sim import ASSUMPTIONS, Block, maturity, simulate
 
 
 def test_nothing_placed_changes_nothing(cells):
@@ -18,7 +18,7 @@ def test_more_trees_cool_more_with_diminishing_returns(cells):
     assert cells.metrics(cells.trees(200))["temp_reduction_c"] > cells.metrics(cells.trees(50))["temp_reduction_c"] > 0
     one = cells.trees(1)[0]
     peak = lambda n: cells.metrics([{**one, "count": n}])["peak_reduction_c"]
-    assert peak(10) < 10 * peak(1)
+    assert peak(2) < 2 * peak(1)                              # two trees in one cell give less than twice one tree
 
 
 def test_assumptions_stay_inside_their_sources(block, cells):
@@ -73,17 +73,20 @@ def test_a_thousand_trees_simulate_under_half_a_second(cells):
     assert time.perf_counter() - t < 0.5                     # PRD performance budget
 
 
-def test_golden_fixtures_match(block):
+def test_golden_fixtures_match():
     """The same cases the browser simulator must reproduce (shared/fixtures/golden.json)."""
     golden = json.loads((ROOT / "shared/fixtures/golden.json").read_text())
+    raw = json.loads((ROOT / golden["block"]).read_text())
     for case in golden["cases"]:
+        block = Block.from_dict({**raw, **{k: case[k] for k in golden["overridable"] if k in case}})
         got = simulate(block, case["placements"], case["years"])
         assert got["metrics"] == case["expected"]["metrics"], case["name"]
         assert round(float(np.array(got["cooling_grid"]).sum()), 2) == case["expected"]["cooling_sum"], case["name"]
 
 
-def test_user_prices_change_costs_not_physics(block):
-    pl = [{"type": "tree", "row": 5, "col": 5, "count": 2}]
+def test_user_prices_change_costs_not_physics(block, cells):
+    r, c = map(int, cells.open[0])
+    pl = [{"type": "tree", "row": r, "col": c, "count": 2}]
     base, cheap = simulate(block, pl, 10), simulate(block, pl, 10, {"tree": 1500})
     assert base["metrics"]["total_cost_inr"] == 6000 and cheap["metrics"]["total_cost_inr"] == 3000
     assert cheap["breakdown"]["unit_cost"]["tree"] == 1500

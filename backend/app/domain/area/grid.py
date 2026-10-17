@@ -11,7 +11,7 @@ import numpy as np
 from app.config import MODEL
 
 M_PER_DEG_LAT = 111_320
-CLASSES = ["built", "road", "trees", "grass", "bare", "water"]  # same order as the demo block
+CLASSES = ["built", "road", "trees", "grass", "bare", "water"]  # landcover codes index into this (stored in every area as landcover_classes)
 BUILT, ROAD, TREES, GRASS, BARE, WATER = range(6)
 LIMITS = MODEL["area"]
 
@@ -80,8 +80,17 @@ class Grid:
         return self.west + self.cols * self.dlng
 
     def cell_of(self, lat: float, lng: float) -> tuple[int, int] | None:
-        r, c = int((self.north - lat) / self.dlat), int((lng - self.west) / self.dlng)
+        r, c = math.floor((self.north - lat) / self.dlat), math.floor((lng - self.west) / self.dlng)   # floor: just outside is -1, not 0
         return (r, c) if 0 <= r < self.rows and 0 <= c < self.cols else None
+
+    def padded(self, pad: int) -> "Grid":
+        """The same grid grown by `pad` cells on every side (the ring around the area); cells line up with this grid's."""
+        return Grid(self.rows + 2 * pad, self.cols + 2 * pad, self.cell_m, self.north + pad * self.dlat, self.west - pad * self.dlng,
+                    self.dlat, self.dlng)
+
+    def refined(self, k: int) -> "Grid":
+        """Each cell split k × k: used to sample fine data (1 m canopy) and average it back into cells."""
+        return Grid(self.rows * k, self.cols * k, self.cell_m / k, self.north, self.west, self.dlat / k, self.dlng / k)
 
     def to_local_m(self, lat: float, lng: float) -> tuple[float, float]:
         """(x east, z south) metres from the NW corner; the 3D view uses the same axes."""

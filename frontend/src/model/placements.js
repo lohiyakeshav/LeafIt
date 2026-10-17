@@ -2,7 +2,7 @@
 //   items        individual things with exact positions (metres from the area's NW corner) for the 3D view
 //   cell-form    {type,row,col,count} per 10 m cell, which is what the simulators and the backend understand
 // Pure functions only, so they're unit-tested without a browser.
-import { RULES } from './rules.js';
+import { RULES, crownM2, spacingM, speciesOf } from './rules.js';
 
 export const MAX_TREES_PER_CELL = RULES.tree.max_count_per_cell;
 
@@ -10,7 +10,7 @@ let seed = 0;
 const uid = () => `${Date.now().toString(36)}${(seed++).toString(36)}`;
 export const cellAt = (x, z, cellM) => ({ row: Math.floor(z / cellM), col: Math.floor(x / cellM) });
 
-export const treeItem = (x, z, cellM) => ({ id: uid(), type: 'tree', x, z, ...cellAt(x, z, cellM) });
+export const treeItem = (x, z, cellM, species = null) => ({ id: uid(), type: 'tree', x, z, ...(species && species !== 'generic' ? { species } : {}), ...cellAt(x, z, cellM) });
 export const stopItem = (x, z, cellM) => ({ id: uid(), type: 'shade_stop', x, z, ...cellAt(x, z, cellM) });
 /** A roof covers every cell its building overlaps (the model works per cell). */
 export const roofItem = (cells, buildingId = null) => ({ id: uid(), type: 'cool_roof', cells, buildingId, row: cells[0][0], col: cells[0][1] });
@@ -24,17 +24,24 @@ export function treesInCell(items, row, col) {
   return n;
 }
 
-/** items -> [{type,row,col,count}]: trees summed per cell, roofs and stops once per cell. */
+/** The species that decides how many trees a cell can hold once `species` joins it: the most space-hungry one there (as the server judges it). */
+export function limitingSpecies(items, row, col, species) {
+  let worst = speciesOf(species);
+  for (const it of items) if (it.type === 'tree' && it.row === row && it.col === col && spacingM(speciesOf(it.species)) > spacingM(worst)) worst = speciesOf(it.species);
+  return worst;
+}
+
+/** items -> [{type,row,col,count,species?}]: trees summed per cell and species, roofs and stops once per cell. */
 export function toCellPlacements(items) {
   const trees = new Map();
   const once = { cool_roof: new Set(), shade_stop: new Set() };
   const out = [];
   for (const it of items) {
     if (it.type === 'tree') {
-      const k = key(it.row, it.col);
+      const k = `${key(it.row, it.col)}:${it.species ?? ''}`;
       const p = trees.get(k);
       if (p) p.count = Math.min(p.count + 1, MAX_TREES_PER_CELL);
-      else { const np = { type: 'tree', row: it.row, col: it.col, count: 1 }; trees.set(k, np); out.push(np); }
+      else { const np = { type: 'tree', row: it.row, col: it.col, count: 1, ...(it.species ? { species: it.species } : {}) }; trees.set(k, np); out.push(np); }
     } else {
       for (const [r, c] of cellsOf(it)) {
         const k = key(r, c);
@@ -59,14 +66,14 @@ function jitter(row, col, k) {
   return [0.15 + 0.7 * next(), 0.15 + 0.7 * next()];
 }
 
-/** [{type,row,col,count}] (agent plans, saved plans) -> items with positions. */
+/** [{type,row,col,count,species?}] (agent plans, saved plans) -> items with positions. */
 export function fromCellPlacements(placements, cellM) {
   const items = [];
   for (const p of placements) {
     if (p.type === 'tree') {
       for (let k = 0; k < (p.count ?? 1); k++) {
         const [fx, fz] = jitter(p.row, p.col, k);
-        items.push(treeItem((p.col + fx) * cellM, (p.row + fz) * cellM, cellM));
+        items.push(treeItem((p.col + fx) * cellM, (p.row + fz) * cellM, cellM, p.species));
       }
     } else if (p.type === 'cool_roof') items.push(roofItem([[p.row, p.col]]));
     else items.push(stopItem((p.col + 0.5) * cellM, (p.row + 0.5) * cellM, cellM));
@@ -91,3 +98,18 @@ export function withoutNearest(items, x, z, radius, cellM) {
 }
 
 export const countItems = (items) => items.length;
+
+/** Mature crown area (m²) the placed trees will cover in each cell, for the humid-climate airflow rule. `extra` are trees about to be added. */
+const crownCache = new WeakMap();   // items array -> its crowns: hovering re-checks the same plan many times
+/** plannedCrownM2 for `items` alone, computed once per plan array (plans are immutable: every edit makes a new array). */
+export function plannedCrownCached(grid, items) {
+  let out = crownCache.get(items);
+  if (!out || out.length !== grid.rows * grid.cols) crownCache.set(items, out = plannedCrownM2(grid, items));
+  return out;
+}
+
+export function plannedCrownM2(grid, items, extra = []) {
+  const out = new Float64Array(grid.rows * grid.cols);
+  for (const it of [...items, ...extra]) if (it.type === 'tree') out[it.row * grid.cols + it.col] += crownM2(speciesOf(it.species));
+  return out;
+}

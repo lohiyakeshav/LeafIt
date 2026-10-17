@@ -13,6 +13,7 @@ export const useSession = create(
       items: [],        // positioned things the user placed (see features/studio/placements.js)
       history: [],      // previous `items` arrays, for undo (not persisted)
       tool: 'tree',
+      species: 'auto',  // what the tree tool plants: 'auto' (best fit for the spot and climate) or a catalogue id
       showAfter: true,
       years: 10,
       budget: 2_000_000,
@@ -29,6 +30,7 @@ export const useSession = create(
       beginStroke: () => set((s) => ({ history: [...s.history.slice(-(HISTORY_LIMIT - 1)), s.items], plan: null })),
       strokeSet: (items) => set({ items }),
       setTool: (tool) => set({ tool }),
+      setSpecies: (species) => set({ species }),
       setShowAfter: (showAfter) => set({ showAfter }),
       setYears: (years) => set({ years, plan: null }),
       setBudget: (budget) => set({ budget }),
@@ -48,7 +50,7 @@ export const useSession = create(
       name: 'leafit-session',
       version: 1,
       storage: createJSONStorage(() => sessionStorage),
-      partialize: ({ blockId, items, tool, showAfter, years, budget, unitCost, plan, options }) => ({ blockId, items, tool, showAfter, years, budget, unitCost, plan, options }),
+      partialize: ({ blockId, items, tool, species, showAfter, years, budget, unitCost, plan, options }) => ({ blockId, items, tool, species, showAfter, years, budget, unitCost, plan, options }),
     },
   ),
 );

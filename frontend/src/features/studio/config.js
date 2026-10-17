@@ -9,7 +9,6 @@ export const TOOLS = [
 ];
 export const VIEW_OPTS  = [{ value: false, label: 'Today' }, { value: true, label: 'With plan' }];
 export const LAYER_OPTS = [{ value: 'heat', label: 'Heat' }, { value: 'sat', label: 'Satellite' }];
-export const YEAR_OPTS  = [{ value: 1, label: 'Yr 1' }, { value: 10, label: 'Yr 10' }, { value: 20, label: 'Yr 20' }];
 export const ITEM_CAP = 5000;       // the API accepts at most 5000 placements
 export const PAINT_SPACING_M = 5;   // trees dropped while painting are at least this far apart
 

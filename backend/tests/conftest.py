@@ -9,18 +9,29 @@ from fastapi.testclient import TestClient
 
 from app import config
 from app.api.deps import block_repository, plan_repository
+from app.domain import plantable
+from app.domain import species as species_mod
 from app.domain.sim import simulate
-from app.integrations import gemini
+from app.integrations import conditions, gemini, osm
 from app.main import app
+
+
+async def _no_osm(ring_grid):
+    return {"ways": [], "pois": [], "ok": False}
+
+
+async def _no_climate(lat, lng):
+    return None
 
 
 @pytest.fixture(autouse=True)
 def offline(monkeypatch, tmp_path):
-    for key in ("GEMINI_API_KEY", "GOOGLE_CLOUD_PROJECT"):
+    for key in ("GEMINI_API_KEY", "GOOGLE_CLOUD_PROJECT", "LEAFIT_VERTEX_CREDENTIALS"):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setattr(gemini, "_client", None)
     monkeypatch.setattr(config, "GOOGLE_MAPS_SERVER_KEY", None)
-    monkeypatch.setattr(config, "ALLOW_SYNTHETIC_AREAS", False)
+    monkeypatch.setattr(osm, "fetch", _no_osm)                       # OpenStreetMap and the weather archive are off too
+    monkeypatch.setattr(conditions, "climate_normal", _no_climate)
     monkeypatch.setattr(plan_repository, "plans_dir", tmp_path / "plans")
     monkeypatch.setattr(block_repository, "areas_dir", tmp_path / "areas")
     monkeypatch.setattr(block_repository, "_cache", {})   # areas built by one test must not leak into the next
@@ -33,8 +44,8 @@ def api():
 
 @pytest.fixture(scope="session")
 def block():
-    """The shipped 600 × 600 m sample block: the fixture every simulator test runs on."""
-    return block_repository.get_block("demo_lajpat")
+    """The shipped real sample (Lajpat Nagar Central Market, 700 × 700 m): the fixture every simulator test runs on."""
+    return block_repository.get_block("lajpat_nagar")
 
 
 class Cells:
@@ -42,9 +53,10 @@ class Cells:
 
     def __init__(self, block):
         self.block = block
-        self.open = np.argwhere(block.building_frac < 0.5)
+        # cells that can take a tree under the placement rules (not carriageway, building or already well shaded)
+        self.open = np.argwhere((plantable.capacity_grid(block, species_mod.get(None)) >= 1) & (block.building_frac < 0.5))
         self.roofs = np.argwhere(block.roof_area > 0)
-        self.road = next((int(r), int(c)) for r, c in self.open if block.is_class(r, c, "road"))
+        self.road = next((int(r), int(c)) for r, c in np.argwhere(block.building_frac < 0.5) if block.is_class(r, c, "road"))   # for shelters
 
     def trees(self, n):
         return [{"type": "tree", "row": int(r), "col": int(c)} for r, c in self.open[:n]]

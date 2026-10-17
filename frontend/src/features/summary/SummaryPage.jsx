@@ -59,7 +59,7 @@ export default function SummaryPage() {
     try {
       const res = await endpoints.createPlan({
         block_id: block.id,
-        placements: placements.map(p => ({ type: p.type, row: p.row, col: p.col, count: p.count })),
+        placements: placements.map(p => ({ type: p.type, row: p.row, col: p.col, count: p.count, ...(p.species ? { species: p.species } : {}) })),   // species decides the nursery lines
         years,
         unit_cost: userPrices ?? undefined,   // the saved plan keeps the prices it was costed with
         name: planName.trim() || 'Untitled plan',
@@ -94,7 +94,7 @@ export default function SummaryPage() {
 
   const wide = useWide();
   const noPlan = !blockId || !placements.length;
-  const blockName = block?.name.replace(' (synthetic demo)', '') ?? '';
+  const blockName = block?.name ?? '';
   const barActions = <ThemeToggle />;
 
   if (noPlan) return (
@@ -144,7 +144,7 @@ export default function SummaryPage() {
     <table style={{ width: '100%', borderCollapse: 'collapse', fontVariantNumeric: 'tabular-nums', fontSize: 13.5 }}>
       <tbody>
         {bom.map((it) => (
-          <tr key={it.type} style={{ borderBottom: '1px solid var(--rule)' }}>
+          <tr key={`${it.type}:${it.species ?? ''}`} style={{ borderBottom: '1px solid var(--rule)' }}>
             <td style={{ padding: '8px 0' }}>{it.item.split(',')[0]}<div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>{it.quantity} {it.unit}{unitCost[it.type] != null ? ` × ${inr(unitCost[it.type])}` : ''}</div></td>
             <td style={{ padding: '8px 0', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 12.5, whiteSpace: 'nowrap', verticalAlign: 'top' }}>{costParts[it.type] != null ? inr(costParts[it.type]) : '—'}</td>
           </tr>

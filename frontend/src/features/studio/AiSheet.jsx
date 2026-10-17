@@ -56,9 +56,9 @@ export default function AiSheet({ block, years, budget, unitCost, onBudget, onAp
 
   function applyPlan() {
     if (!result) return;
-    const placements = result.placements.map(p => ({ type: p.type, row: p.row, col: p.col, count: p.count ?? 1 }));
+    const placements = result.placements.map(p => ({ type: p.type, row: p.row, col: p.col, count: p.count ?? 1, ...(p.species ? { species: p.species } : {}) }));
     const chosen = result.scenarios?.find(s => s.id === result.chosen);
-    onApply?.(placements, chosen?.label ?? '');
+    onApply?.(placements, chosen?.label ?? '', result.answer ?? null);
   }
 
   return (
@@ -198,6 +198,7 @@ function AiResult({ result, onApply }) {
   const gemini    = result.source === 'gemini';
   const unverified = result.unverified_numbers ?? [];
   const scenarios  = result.scenarios ?? [];
+  const answer     = result.answer;
   const [trailOpen, setTrailOpen] = useState(false);
 
   return (
@@ -222,7 +223,28 @@ function AiResult({ result, onApply }) {
       </Reveal>
       <div style={{ height: 16 }} />
 
-      <Bullets text={result.explanation} />
+      {answer?.headline && <div style={{ fontFamily: 'var(--font-sans)', fontSize: 18, fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1.3, marginBottom: 12 }}>{answer.headline}</div>}
+      <Bullets text={answer?.bullets?.length ? answer.bullets.map(b => `- ${b}`).join('\n') : result.explanation} />
+
+      {answer?.zone_actions?.length > 0 && (
+        <div style={{ marginTop: 18 }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>WHERE AND WHY</div>
+          {answer.zone_actions.map((a, i) => (
+            <div key={i} style={{ padding: '10px 0', borderBottom: '1px solid var(--rule)' }}>
+              <div style={{ fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 600 }}>{a.zone}{a.species && a.species !== 'auto' ? ` · ${a.species}` : ''}: {a.action}</div>
+              {a.why && <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 3 }}>{a.why}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {result.checks && <PlanChecks checks={result.checks} />}
+
+      {answer?.caveats?.length > 0 && (
+        <ul style={{ margin: '14px 0 0', paddingLeft: 18, fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.5 }}>
+          {answer.caveats.map((c, i) => <li key={i}>{c}</li>)}
+        </ul>
+      )}
 
       {gemini && (
         <Reveal delay={0.4}>
@@ -311,5 +333,27 @@ function ScenarioCard({ sc, chosen }) {
         </motion.div>
       </div>
     </motion.div>
+  );
+}
+
+function PlanChecks({ checks: c }) {
+  const rows = [
+    ['Budget used', c.budget_used_pct == null ? null : `${c.budget_used_pct}%`],
+    ['Trees on already-shaded ground', c.trees ? `${Math.round((c.low_value_tree_ratio ?? 0) * 100)}%` : null],
+    ['Cooling for vulnerable residents', c.equity_cooling_c == null ? null : `${Math.abs(c.equity_cooling_c) >= 0.005 ? '−' : ''}${Math.abs(c.equity_cooling_c).toFixed(2)}°`],
+    ['New cool roofs', c.cool_roofs ? `${c.cool_roofs}${c.residents_under_cool_roofs == null ? '' : ` · ${c.residents_under_cool_roofs.toLocaleString()} residents below`}` : null],
+    ['Shaded bus stops', c.shade_stops ? `${c.shade_stops}${c.bus_stops_sheltered?.length ? ` (at ${c.bus_stops_sheltered.join(', ')})` : ''}` : null],
+  ].filter(([, v]) => v != null);
+  const todo = [...((c.trees >= 20 && c.dominant_species_share > 0.6) ? [`${Math.round(c.dominant_species_share * 100)}% of the trees are one species: mix species to protect against pests`] : []), ...(c.hot_zones_untouched ?? []).map(z => `Hot zone ${z} has nothing planned`), ...(c.vulnerable_zones_untouched ?? []).map(z => `Many vulnerable residents in ${z}, nothing planned`)];
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>PLAN CHECK</div>
+      {rows.map(([k, v]) => (
+        <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid var(--rule)', fontSize: 13 }}>
+          <span>{k}</span><span style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5 }}>{v}</span>
+        </div>
+      ))}
+      {todo.map(t => <div key={t} style={{ fontSize: 12.5, color: 'var(--warn)', marginTop: 6 }}>{t}</div>)}
+    </div>
   );
 }

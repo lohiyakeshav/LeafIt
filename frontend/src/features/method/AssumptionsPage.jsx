@@ -17,6 +17,7 @@ export default function AssumptionsPage() {
   const [assumptions, setAssumptions] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     endpoints.assumptions()
@@ -78,10 +79,24 @@ export default function AssumptionsPage() {
 
         {assumptions && Array.isArray(assumptions) && (
           <div style={{ marginTop: 8 }}>
-            {assumptions.map((a, i) => (
-              <Reveal key={a.item || i} delay={0.1 + i * 0.04}>
+            {assumptions.filter(a => a.key).length > 0 && (
+              <div style={{ margin: '14px 0 4px', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--warn)' }}>
+                THE THREE ASSUMPTIONS MOST WORTH CHALLENGING
+              </div>
+            )}
+            {assumptions.filter(a => a.key).map((a, i) => (
+              <Reveal key={a.item} delay={0.1 + i * 0.04}>
                 <AssumptionItem item={a} />
               </Reveal>
+            ))}
+            <button
+              onClick={() => setShowAll(o => !o)}
+              style={{ margin: '18px 0 4px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent)' }}
+            >
+              {showAll ? 'HIDE' : 'SHOW'} ALL OTHER ASSUMPTIONS ({assumptions.filter(a => !a.key).length})
+            </button>
+            {showAll && assumptions.filter(a => !a.key).map((a, i) => (
+              <AssumptionItem key={a.item || i} item={a} />
             ))}
           </div>
         )}

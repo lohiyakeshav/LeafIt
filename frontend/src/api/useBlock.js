@@ -11,7 +11,7 @@ export function loadBlock(id) {
   return cache.get(id);
 }
 
-/** Forget a cached block (a freshly rebuilt area can replace an earlier synthetic stand-in under the same id). */
+/** Forget a cached block (a rebuilt area, e.g. one first built while OpenStreetMap was down, replaces it under the same id). */
 export const forgetBlock = (id) => cache.delete(id);
 
 /** { block, error } for a block/area id; block is null while loading. */

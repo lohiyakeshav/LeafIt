@@ -14,10 +14,10 @@ async def create_area(req: AreaIn, service: AreaServiceDep):
 
 @router.get("/areas/{area_id}")
 def get_area(area_id: str, service: AreaServiceDep):
-    raw, synthetic = service.get_area(area_id)
-    # real satellite data for a given id never changes, so the browser may keep it forever; a synthetic stand-in may be
-    # replaced by the real thing later under the same id, so it must be revalidated
-    cache = "no-cache" if synthetic else "public, max-age=31536000, immutable"
+    raw, provisional = service.get_area(area_id)
+    # real satellite data for a given id never changes, so the browser may keep it forever; a provisional area (built while
+    # OpenStreetMap was down, or by an older version) is rebuilt later under the same id, so it must be revalidated
+    cache = "no-cache" if provisional else "public, max-age=31536000, immutable"
     return Response(raw, media_type="application/json", headers={"Cache-Control": cache})
 
 

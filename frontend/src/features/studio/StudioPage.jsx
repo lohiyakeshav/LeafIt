@@ -11,25 +11,30 @@ import { ImpactPanel } from '../../shared/metrics/ImpactPanel.jsx';
 import { MetricWhyModal } from '../../shared/metrics/MetricWhyModal.jsx';
 import { Dialog, Kicker, Pill, PillToggle, CircleBtn, Spinner, ThemeToggle, CurrencyPicker, LABEL, useToast } from '../../shared/ui';
 import { useBlock } from '../../api/useBlock.js';
+import { endpoints } from '../../api/endpoints.js';
 import { useSession } from '../../state/session.js';
 import { toGrid } from '../../model/grid.js';
-import { whyNot } from '../../model/rules.js';
+import { SPECIES_BY_ID, crownM2, humidViolationAt, speciesOf, whyNot } from '../../model/rules.js';
+import { ZONE_LABELS } from '../../model/zones.js';
+import { AUTO, autoSpecies } from '../../model/species.js';
 import { useSimulation } from '../../model/useSimulation.js';
 import AiSheet from './AiSheet.jsx';
-import { TOOLS, VIEW_OPTS, LAYER_OPTS, YEAR_OPTS, ITEM_CAP, PAINT_SPACING_M, DEFAULT_BUDGET } from './config.js';
+import { TOOLS, VIEW_OPTS, LAYER_OPTS, ITEM_CAP, PAINT_SPACING_M, DEFAULT_BUDGET } from './config.js';
 import { ToolCard, ExtraBtn } from './components/ToolCard.jsx';
 import { HeatLegend, TurnControl } from './components/StageOverlays.jsx';
 import { PlanOptions, CompareTable } from './components/PlanOptions.jsx';
 import { CostsPanel } from './components/CostsPanel.jsx';
+import { SpeciesPicker } from './components/SpeciesPicker.jsx';
+import { YearSlider } from './components/YearSlider.jsx';
 import Diorama from './diorama/Diorama.jsx';
 import { buildingsOf } from './diorama/geometry.js';
 import {
-  MAX_TREES_PER_CELL, cellAt, fromCellPlacements, roofItem, stopItem, toCellPlacements, treeItem, treesInCell,
+  cellAt, fromCellPlacements, limitingSpecies, plannedCrownCached, roofItem, stopItem, toCellPlacements, treeItem, treesInCell,
   withoutCell, withoutId, withoutNearest,
 } from '../../model/placements.js';
 
 // zustand actions are stable references, so they can live outside the component and out of every dependency list
-const { openBlock, setItems, undo, clear, setTool, setShowAfter, setYears, setBudget, setUnitCost, beginStroke, strokeSet, saveOption, loadOption, removeOption } = useSession.getState();
+const { openBlock, setItems, undo, clear, setTool, setSpecies, setShowAfter, setYears, setBudget, setUnitCost, beginStroke, strokeSet, saveOption, loadOption, removeOption } = useSession.getState();
 
 export default function StudioPage() {
   const { id } = useParams();
@@ -40,6 +45,10 @@ export default function StudioPage() {
   const storeBlockId = useSession((s) => s.blockId);
   const items = useSession((s) => s.items);
   const tool = useSession((s) => s.tool);
+  const species = useSession((s) => s.species);
+  const [aiNote, setAiNote] = useState(null);     // { answer, items }: the AI planner's explanation, shown only while that exact plan is on the map
+  const [liveFor, setLiveFor] = useState({ id: null, c: null });   // today's weather and AQI (the stored ones are from when the area was built)
+  const liveNow = liveFor.id === id ? liveFor.c : null;
   const showAfter = useSession((s) => s.showAfter);
   const years = useSession((s) => s.years);
   const budget = useSession((s) => s.budget);
@@ -48,6 +57,11 @@ export default function StudioPage() {
   const options = useSession((s) => s.options);
 
   useEffect(() => { openBlock(id); }, [id]);   // a different place starts with an empty plan
+  useEffect(() => {
+    let alive = true;
+    if (block?.kind === 'area') endpoints.areaConditions(id).then((c) => alive && setLiveFor({ id, c }), () => {});
+    return () => { alive = false; };
+  }, [id, block?.kind]);
   const ready = Boolean(block) && storeBlockId === id;
 
   const grid = useMemo(() => (block ? toGrid(block) : null), [block]);
@@ -59,7 +73,7 @@ export default function StudioPage() {
     if (!ready || !grid || !code) return;
     decodePlan(code).then((d) => {
       if (d) {
-        setItems(d.packed.map(([k, a, b]) => (k === 'r' ? roofItem(b, a) : (k === 't' ? treeItem : stopItem)(a, b, grid.cellM))));
+        setItems(d.packed.map(([k, a, b, sp]) => (k === 'r' ? roofItem(b, a) : k === 't' ? treeItem(a, b, grid.cellM, SPECIES_BY_ID[sp] ? sp : null) : stopItem(a, b, grid.cellM))));
         if (d.years) setYears(d.years);
         toast('Shared plan loaded');
       } else toast('That share link is damaged');
@@ -116,10 +130,13 @@ export default function StudioPage() {
     if (current.length >= ITEM_CAP) return { valid: false, reason: `That's the ${ITEM_CAP.toLocaleString()}-item limit for one plan` };
     if (tool !== 'cool_roof' && t.onRoof) return { valid: false, reason: tool === 'tree' ? 'That’s a rooftop: trees go on the ground' : 'That’s a rooftop: bus stops go on roads' };
     if (tool === 'tree') {
-      const why = whyNot(grid, 'tree', row, col);
+      const sp = species === AUTO ? autoSpecies(grid, years, row, col) : species;
+      const why = whyNot(grid, 'tree', row, col, null, { total: treesInCell(current, row, col) + 1, species: limitingSpecies(current, row, col, sp).id });
       if (why) return { valid: false, reason: why };
-      if (treesInCell(current, row, col) >= MAX_TREES_PER_CELL) return { valid: false, reason: `Cell is full (${MAX_TREES_PER_CELL} trees)` };
-      return { valid: true };
+      if (grid.humid && humidViolationAt(grid, plannedCrownCached(grid, current), row, col, crownM2(speciesOf(sp)))) {
+        return { valid: false, reason: 'Too many trees close together for a humid climate: leave room for air to move' };
+      }
+      return { valid: true, species: sp };
     }
     if (tool === 'shade_stop') {
       const taken = new Set(current.filter((i) => i.type === 'shade_stop').map((i) => `shade_stop:${i.row}:${i.col}`));
@@ -128,7 +145,7 @@ export default function StudioPage() {
     }
     if (!t.building) return { valid: false, reason: 'Tap a building roof' };
     return current.some((i) => i.type === 'cool_roof' && i.buildingId === t.building.id) ? { valid: false, reason: 'Roof already coated' } : { valid: true };
-  }, [grid, tool]);
+  }, [grid, tool, species, years]);
 
   const erase = useCallback((t) => {
     const current = useSession.getState().items;
@@ -148,10 +165,11 @@ export default function StudioPage() {
   const place = useCallback((t) => {
     if (tool === 'erase') { erase(t); return; }
     const current = useSession.getState().items;
-    const { valid, reason } = check(t, current);
-    if (!valid) { toast(reason); return; }
+    const verdict = check(t, current);
+    if (!verdict.valid) { toast(verdict.reason); return; }
     const m = grid.cellM;
-    const item = tool === 'tree' ? treeItem(t.x, t.z, m) : tool === 'shade_stop' ? stopItem(t.x, t.z, m) : roofItem(t.building.cells, t.building.id);
+    const planted = verdict.species;
+    const item = tool === 'tree' ? treeItem(t.x, t.z, m, planted) : tool === 'shade_stop' ? stopItem(t.x, t.z, m) : roofItem(t.building.cells, t.building.id);
     setItems([...current, item]);
     view.current?.ripple(t.x, t.z);
   }, [tool, check, grid, erase, toast]);
@@ -162,9 +180,10 @@ export default function StudioPage() {
     const last = lastPaint.current;
     if (last && Math.hypot(t.x - last.x, t.z - last.z) < PAINT_SPACING_M) return;
     const current = useSession.getState().items;
-    if (!check(t, current).valid) return;
+    const verdict = check(t, current);
+    if (!verdict.valid) return;
     lastPaint.current = t;
-    strokeSet([...current, treeItem(t.x, t.z, grid.cellM)]);
+    strokeSet([...current, treeItem(t.x, t.z, grid.cellM, verdict.species)]);
   }, [tool, check, grid]);
 
   // 2D fallback: the flat grid reports cells, we turn them into the same placement calls
@@ -184,9 +203,10 @@ export default function StudioPage() {
     return <div style={{ height: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{error ? <Kicker color="var(--warn)">{error.message}</Kicker> : <Spinner />}</div>;
   }
 
-  const blockName = block.name.replace(' (synthetic demo)', '');
-  const live = block.conditions;
-  const source = block.synthetic ? 'SYNTHETIC STAND-IN' : 'SATELLITE DATA';
+  const blockName = block.name;
+  const live = liveNow?.air_temp_c != null ? liveNow : block.conditions;
+  const isLive = live === liveNow;
+  const source = block.sample ? 'SATELLITE DATA · SAMPLE' : 'SATELLITE DATA';
   const goReview = items.length ? () => navigate('/summary') : null;
 
   const title = (
@@ -221,9 +241,10 @@ export default function StudioPage() {
     <>
       <PillToggle options={VIEW_OPTS} value={showAfter} onChange={setShowAfter} dense expand />
       <PillToggle options={LAYER_OPTS} value={layer} onChange={setLayer} dense expand />
-      <PillToggle options={YEAR_OPTS} value={years} onChange={setYears} dense expand />
+      <div style={{ gridColumn: '1 / -1' }}><YearSlider value={years} onChange={setYears} /></div>
     </>
   );
+  const speciesPicker = tool === 'tree' && <SpeciesPicker value={species} onChange={setSpecies} climate={block.climate?.class ?? null} compact={!wide} />;
 
   const canPaint = tool === 'tree' && !flat;
   const painting = paint && canPaint;   // switching tool simply stops painting; no effect needed
@@ -236,7 +257,8 @@ export default function StudioPage() {
   const stage = flat ? (
     <div style={{ height: '100%', containerType: 'size' }}>
       <HeatGrid block={block} placements={cellPlacements} cooling={sim.cooling} showAfter={showAfter} onTap={tapCell} onLongPress={longCell}
-        isValid={tool === 'erase' ? null : (r, c) => !whyNot(grid, tool, r, c)} />
+        isValid={tool === 'erase' ? null : tool === 'cool_roof' ? (r, c) => !whyNot(grid, tool, r, c)
+          : (r, c) => check({ x: (c + 0.5) * grid.cellM, z: (r + 0.5) * grid.cellM }, items).valid} />
     </div>
   ) : (
     <div style={{ position: 'relative', width: '100%', height: wide ? '100%' : 'min(62dvh, 560px)', minHeight: 320, borderRadius: 'var(--radius)', overflow: 'hidden', border: '1px solid var(--rule)', background: 'var(--sunk)' }}>
@@ -250,7 +272,7 @@ export default function StudioPage() {
       {layer === 'heat' && heatRange && <HeatLegend lo={heatRange[0]} hi={heatRange[1]} />}
       <TurnControl azimuth={azimuth} onTurn={(a) => view.current?.setAzimuth(a)} onReset={() => view.current?.resetView()} />
       <div style={{ position: 'absolute', left: 12, bottom: 10, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', pointerEvents: 'none', maxWidth: '60%' }}>
-        {sat?.ok ? sat.copyright : sat?.error === 'no-key' ? 'Add VITE_GOOGLE_MAPS_API_KEY to show the real satellite photo' : sat?.ok === false && sat.error !== 'synthetic' ? 'Satellite photo unavailable, showing a painted map' : ''}
+        {sat?.ok ? sat.copyright : sat?.error === 'no-key' ? 'Add VITE_GOOGLE_MAPS_API_KEY to show the real satellite photo' : sat?.ok === false ? 'Satellite photo unavailable, showing a painted map' : ''}
       </div>
     </div>
   );
@@ -271,13 +293,10 @@ export default function StudioPage() {
     <ImpactPanel metrics={sim.metrics} breakdown={sim.breakdown} budget={budget} years={years} compact={!wide} onInfo={setWhyKey} />
   );
 
-  const aqiText = live?.aqi ? ` · AQI ${live.aqi}${live.aqi_source === 'default' ? ' (Delhi default, no live reading)' : ''}` : '';
-  const liveLine = live?.air_temp_c != null ? `Right now: ${Math.round(live.air_temp_c)} °C air${aqiText}` : null;
+  const aqiText = live?.aqi != null ? ` · AQI ${live.aqi}` : ' · no AQI reading';
+  const liveLine = live?.air_temp_c != null ? `${isLive ? 'Right now' : live.fetched_at ? `On ${new Date(live.fetched_at * 1000).toLocaleDateString()}` : 'When the area was built'}: ${Math.round(live.air_temp_c)} °C air${aqiText}` : null;
   const note = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12.5, lineHeight: 1.5, color: 'var(--muted)' }}>
-      {block.synthetic && block.kind === 'area' && (
-        <p><strong style={{ color: 'var(--warn)' }}>Not real data: </strong>the satellite service wasn't reachable, so this area is a synthetic stand-in. Numbers are for trying the tool only.</p>
-      )}
       {liveLine && <p>{liveLine}</p>}
       {block.lst_period && <p>Surface heat: hot-season satellite baseline ({block.lst_period}).</p>}
       {sim.error && <p style={{ color: 'var(--warn)' }}>{sim.error}</p>}
@@ -302,6 +321,7 @@ export default function StudioPage() {
               <div style={{ ...LABEL, marginBottom: 2 }}>PLACE</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>{toolCards}</div>
               <div style={{ display: 'flex', gap: 6 }}>{extras}</div>
+              {speciesPicker}
               <div style={{ ...LABEL, marginTop: 12, marginBottom: 2 }}>VIEW</div>
               {viewControls}
               <div style={{ marginTop: 10 }}>{costsPanel}</div>
@@ -321,6 +341,7 @@ export default function StudioPage() {
             <div style={{ padding: '12px var(--gutter)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {viewControls}
               <div style={{ display: 'flex', gap: 8 }}>{extras}</div>
+              {speciesPicker && <div style={{ gridColumn: '1 / -1' }}>{speciesPicker}</div>}
             </div>
             <div style={{ padding: '0 12px' }}>{stage}</div>
             <div style={{ padding: '24px var(--gutter) 32px', display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -349,14 +370,27 @@ export default function StudioPage() {
       <AnimatePresence>
         {whyKey && <MetricWhyModal metricKey={whyKey} metrics={sim.metrics} breakdown={sim.breakdown} onClose={() => setWhyKey(null)} />}
       </AnimatePresence>
+      {aiNote?.items === items && aiNote.answer?.headline && (
+        <div style={{ position: 'fixed', left: wide ? 290 : 16, bottom: 16, maxWidth: wide ? 330 : 360, zIndex: 20, background: 'var(--surface)', border: '1px solid var(--rule)', borderRadius: 16, padding: '12px 14px', boxShadow: '0 8px 30px rgba(0,0,0,0.18)' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+            <span style={{ ...LABEL, flex: 1 }}>ABOUT THIS PLAN</span>
+            <button onClick={() => setAiNote(null)} aria-label="Dismiss" style={{ cursor: 'pointer', color: 'var(--muted)', fontSize: 16, lineHeight: 1 }}>×</button>
+          </div>
+          <div style={{ fontSize: 13.5, fontWeight: 600, marginTop: 6 }}>{aiNote.answer.headline}</div>
+          {(aiNote.answer.zone_actions ?? []).slice(0, 4).map((z, i) => (
+            <div key={i} style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginTop: 4 }}><b>{z.zone}</b>: {z.action} <button onClick={() => view.current?.highlightZone(z.zone)} aria-label={`Show the ${ZONE_LABELS[z.zone] ?? z.zone} on the map`} style={{ cursor: 'pointer', color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>Show</button></div>
+          ))}
+        </div>
+      )}
       <AnimatePresence>
         {showAi && (
           <AiSheet
             block={block} years={years} budget={budget} unitCost={userPrices} onBudget={setBudget}
-            onApply={(pls) => {
+            onApply={(pls, label, answer) => {
               // keep the user's own plan so it can be compared with the AI's
               if (items.length && !options.some((o) => o.items === items)) saveOption(sim.metrics, 'Your plan');
-              setItems(fromCellPlacements(pls, grid.cellM)); setShowAi(false); toast('AI plan applied · your plan saved to compare');
+              const applied = fromCellPlacements(pls, grid.cellM);
+              setItems(applied); setAiNote(answer ? { answer, items: applied } : null); setShowAi(false); toast('AI plan applied · your plan saved to compare');
             }}
             onClose={() => setShowAi(false)}
           />

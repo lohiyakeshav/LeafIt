@@ -1,4 +1,4 @@
-// Painted ground for blocks without satellite imagery (the demo block, or when the Map Tiles key is missing).
+// Painted ground when there is no satellite photo (the Map Tiles key is missing or the tiles failed).
 // Each cell gets its land-cover colour with a little deterministic grain, so it reads as a hand-painted map, not a grid.
 
 const COLORS = {

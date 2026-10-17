@@ -7,18 +7,24 @@ import { simulate, validate } from './sim.js';
 
 const root = new URL('../../../', import.meta.url);
 const golden = JSON.parse(readFileSync(new URL('shared/fixtures/golden.json', root), 'utf8'));
-const grid = toGrid(JSON.parse(readFileSync(new URL(golden.block, root), 'utf8')));
+const raw = JSON.parse(readFileSync(new URL(golden.block, root), 'utf8'));
+const grid = toGrid(raw);
+// a case may override parts of the sample block (the fixture lists which): the rules the block alone can't exercise
+const gridFor = (c) => toGrid({ ...raw, ...Object.fromEntries(golden.overridable.filter((k) => k in c).map((k) => [k, c[k]])) });
 
 // rounded outputs may differ by one unit in the last place on exact ties; anything beyond that is a real drift
 const close = (a, b, digits) => expect(Math.abs(a - b)).toBeLessThanOrEqual(1.01 * 10 ** -digits);
-const DIGITS = { temp_reduction_c: 3, peak_reduction_c: 2, surface_reduction_c: 3, roof_surface_reduction_c: 2,
+const DIGITS = { temp_reduction_c: 3, air_reduction_c: 3, peak_reduction_c: 2, surface_reduction_c: 3, roof_surface_reduction_c: 2,
   heat_exposure_pct: 1, heat_exposure_reduction_pct: 1, co2_captured_kg_per_year: 0, aqi_change: 3, total_cost_inr: 0 };
 
 describe('browser simulator matches the Python one', () => {
   for (const c of golden.cases) {
     it(c.name, () => {
-      const out = simulate(grid, c.placements, c.years);
+      const g = gridFor(c);
+      const out = simulate(g, c.placements, c.years);
       for (const [k, d] of Object.entries(DIGITS)) close(out.metrics[k], c.expected.metrics[k], d);
+      if (c.expected.metrics.equity_cooling_c === null) expect(out.metrics.equity_cooling_c).toBeNull();
+      else close(out.metrics.equity_cooling_c, c.expected.metrics.equity_cooling_c, 3);
       if (c.expected.metrics.cost_per_degree_inr === null) expect(out.metrics.cost_per_degree_inr).toBeNull();
       else expect(Math.abs(out.metrics.cost_per_degree_inr / c.expected.metrics.cost_per_degree_inr - 1)).toBeLessThan(0.01);
       for (const [name, v] of Object.entries(c.expected.metrics.landmark_cooling_c)) close(out.metrics.landmark_cooling_c[name], v, 2);
@@ -26,13 +32,13 @@ describe('browser simulator matches the Python one', () => {
       expect(Math.abs(Math.max(...out.cooling) - c.expected.cooling_max)).toBeLessThan(0.011);
       for (const [rc, v] of Object.entries(c.expected.cooling_samples)) {
         const [r, col] = rc.split(',').map(Number);
-        expect(Math.abs(out.cooling[r * grid.cols + col] - v)).toBeLessThan(0.011);
+        expect(Math.abs(out.cooling[r * g.cols + col] - v)).toBeLessThan(0.011);
       }
     });
   }
 
-  it('is fast enough to run on every pointer move (1000 trees)', () => {
-    const big = golden.cases.find((c) => c.name === 'thousand_trees');
+  it('is fast enough to run on every pointer move (hundreds of trees)', () => {
+    const big = golden.cases.find((c) => c.name === 'many_trees');
     simulate(grid, big.placements, big.years); // warm up the JIT
     const t = performance.now();
     simulate(grid, big.placements, big.years);
@@ -50,7 +56,8 @@ describe('browser simulator matches the Python one', () => {
 });
 
 describe('user-edited prices', () => {
-  const pl = [{ type: 'tree', row: 5, col: 5, count: 2 }];
+  const open = golden.cases.find((c) => c.name === 'fifty_trees').placements[0];   // a cell the rules accept in the real sample
+  const pl = [{ type: 'tree', row: open.row, col: open.col, count: 2 }];
   it('change every cost figure, and only those', () => {
     const base = simulate(grid, pl, 10), cheap = simulate(grid, pl, 10, { tree: 1500 });
     expect(base.metrics.total_cost_inr).toBe(6000);

@@ -1,7 +1,8 @@
-"""Bill of materials, vendors and quote links (PRD §10). Pure logic: the vendor list and plans come from app/repositories."""
+"""Bill of materials, vendors and quote links (PRD §10). Pure logic: vendors come from integrations/vendors (Places), plans from app/repositories."""
 import math
 from urllib.parse import quote
 
+from app.domain import species as species_mod
 from app.domain.sim import Block
 
 BOM_ITEMS = {  # intervention -> (category, item, unit)
@@ -12,13 +13,25 @@ BOM_ITEMS = {  # intervention -> (category, item, unit)
 
 
 def bom(block: Block, placements: list[dict]) -> list[dict]:
-    qty = {t: 0.0 for t in BOM_ITEMS}
+    """What to buy: one nursery line per tree species (the generic tree keeps the plain wording), then roofs and shelters."""
+    qty = {t: 0.0 for t in BOM_ITEMS if t != "tree"}
+    trees: dict[str, int] = {}
     for p in placements:
         t = p["type"]
-        qty[t] += block.roof_area[p["row"], p["col"]] if t == "cool_roof" else p.get("count", 1)
+        if t == "tree":
+            sp = species_mod.get(p.get("species"))["id"]
+            trees[sp] = trees.get(sp, 0) + p.get("count", 1)
+        else:
+            qty[t] += block.roof_area[p["row"], p["col"]] if t == "cool_roof" else p.get("count", 1)
     plural = lambda u, q: u if u == "m²" or round(q) == 1 else u + "s"
-    return [{"type": t, "category": BOM_ITEMS[t][0], "item": BOM_ITEMS[t][1], "quantity": round(q),
-             "unit": plural(BOM_ITEMS[t][2], q)} for t, q in qty.items() if q]
+    items = []
+    for sp_id, n in sorted(trees.items(), key=lambda kv: -kv[1]):
+        sp = species_mod.get(sp_id)
+        name = BOM_ITEMS["tree"][1] if sp_id == species_mod.DEFAULT else f"{sp['common']} ({sp['scientific']}) saplings (2–3 m), planting and 3 years of care"
+        items.append({"type": "tree", "category": "nursery", "item": name, "quantity": n, "unit": plural("tree", n), "species": sp_id})
+    items += [{"type": t, "category": BOM_ITEMS[t][0], "item": BOM_ITEMS[t][1], "quantity": round(q), "unit": plural(BOM_ITEMS[t][2], q)}
+              for t, q in qty.items() if q]
+    return items
 
 
 def center(block: Block) -> tuple[float, float]:
@@ -48,11 +61,11 @@ def find_vendors(vendors: list[dict], near: tuple[float, float], categories: set
     for cat in {v["category"] for v in out} - {v["category"] for v in inside}:
         far = sorted((v for v in out if v["category"] == cat), key=lambda v: v["distance_km"])[:NEAREST_FALLBACK]
         inside += [{**v, "beyond_radius": True} for v in far]
-    return sorted(inside, key=lambda v: (v["beyond_radius"], v["distance_km"] - v["rating"]))  # ponytail: naive rank, 1★ ≈ 1 km
+    return sorted(inside, key=lambda v: (v["beyond_radius"], v["distance_km"] - (v.get("rating") or 0)))  # naive rank: 1★ ≈ 1 km
 
 
 def quote_links(plan: dict, block: Block, items: list[dict], vendor: dict) -> dict:
-    lines = [f"Hello {vendor['name'].removesuffix(' (demo)')},", f"LeafIt quote request for {block.meta['name']} (plan {plan['id']}):"]
+    lines = [f"Hello {vendor['name']},", f"LeafIt quote request for {block.meta['name']} (plan {plan['id']}):"]
     lines += [f"• {i['item']}: {i['quantity']:,} {i['unit']}" for i in items if i["category"] == vendor["category"]]
     lines.append("Please share your quote and earliest start date. Thank you.")
     text = "\n".join(lines)
@@ -60,5 +73,6 @@ def quote_links(plan: dict, block: Block, items: list[dict], vendor: dict) -> di
     return {
         "message": text,
         "whatsapp_url": f"https://wa.me/{phone}?text={quote(text)}",
-        "mailto_url": f"mailto:{vendor.get('email', '')}?subject={quote('LeafIt quote request ' + plan['id'])}&body={quote(text)}",
+        "tel_url": f"tel:+{phone}" if phone else None,
+        "website": vendor.get("website"), "maps_url": vendor.get("maps_url"),
     }

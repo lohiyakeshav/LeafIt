@@ -25,7 +25,6 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 COPY shared shared
 COPY backend/app backend/app
 COPY backend/data/blocks backend/data/blocks
-COPY backend/data/vendors.json backend/data/
 COPY --from=web /web/frontend/dist frontend/dist
 ENV LEAFIT_WEB_DIR=/srv/frontend/dist
 WORKDIR /srv/backend
