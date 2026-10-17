@@ -1,8 +1,8 @@
-"""Live planner evaluation: the Gemini agent against the offline rules planner, on real areas and a handful of briefs.
+"""Live planner evaluation: the Gemini agent on real areas and a handful of briefs.
 
-    cd backend && conda run -n leafit python scripts/agent_eval.py [--areas lajpat,gachibowli] [--briefs 0,1,2] [--rules-only]
+    cd backend && .venv/bin/python scripts/agent_eval.py [--areas lajpat,gachibowli] [--briefs 0,1,2]
 
-Needs Earth Engine (to build the areas) and GEMINI_API_KEY (for the agent; without it only the rules planner runs).
+Needs Earth Engine (to build the areas) and Gemini access (GEMINI_API_KEY, or Vertex AI via GOOGLE_CLOUD_PROJECT).
 For each area x brief it prints what a reviewer would check: whether the plan is sensible (trees on shaded ground, zones named,
 vulnerable zones left out), whether the prose invented numbers, cooling (surface, air, equity), cost per degree and time.
 Areas are cached under backend/data/eval_areas so repeat runs are quick.
@@ -69,24 +69,21 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--areas", default=",".join(AREAS))
     ap.add_argument("--briefs", default=",".join(map(str, range(len(BRIEFS)))))
-    ap.add_argument("--rules-only", action="store_true")
     a = ap.parse_args()
-    llm = None if a.rules_only else gemini.client()
-    print(f"planner model: {gemini.PLANNER_MODEL if llm else 'none (rules only)'}")
+    llm = gemini.client()
+    if not llm:
+        sys.exit("No Gemini access: set GEMINI_API_KEY (or GOOGLE_CLOUD_PROJECT for Vertex AI).")
+    print(f"planner model: {gemini.PLANNER_MODEL}")
     results = []
     for key in a.areas.split(","):
         block = load_area(key)
         for i in map(int, a.briefs.split(",")):
-            for name, who in (("gemini", llm), ("rules", None)):
-                if name == "gemini" and not llm:
-                    continue
-                try:
-                    agent.client = (lambda: llm) if who else (lambda: None)   # plan() asks for the client itself when none is passed
-                    r = run(block, BRIEFS[i], BUDGET.get(i, 2_000_000), who)
-                except Exception as e:  # noqa: BLE001 - report and carry on
-                    r = {"error": repr(e)}
-                results.append({"area": key, "brief": BRIEFS[i], "planner": name, **r})
-                print(json.dumps(results[-1], ensure_ascii=False))
+            try:
+                r = run(block, BRIEFS[i], BUDGET.get(i, 2_000_000), llm)
+            except Exception as e:  # noqa: BLE001 - report and carry on
+                r = {"error": repr(e)}
+            results.append({"area": key, "brief": BRIEFS[i], **r})
+            print(json.dumps(results[-1], ensure_ascii=False))
     ok = [r for r in results if "error" not in r]
     print(f"\n{len(ok)}/{len(results)} runs completed; unverified numbers in {sum(bool(r['unverified']) for r in ok)}; "
           f"plans above the 10% low-value limit: {sum(r['low_value_ratio'] > 0.10 for r in ok)}")

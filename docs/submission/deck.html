@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LeafIt Pitch Deck</title>
+<style>
+@font-face { font-family: Geist; src: url(../../frontend/public/Geist.ttf); font-weight: 100 900; }
+@font-face { font-family: GeistMono; src: url(../../frontend/public/GeistMono.ttf); }
+@font-face { font-family: Serif; src: url(../../frontend/public/InstrumentSerif-Regular.ttf); }
+@font-face { font-family: Serif; src: url(../../frontend/public/InstrumentSerif-Italic.ttf); font-style: italic; }
+:root { --page:#141815; --surface:#1B201C; --hi:#222823; --ink:#E8EDE3; --soft:rgba(232,237,227,.78); --muted:#8C9589;
+  --rule:rgba(232,237,227,.14); --accent:#9EE35F; --cool:#7FD6FF; --warn:#FF8A5B; }
+@page { size: 1280px 720px; margin: 0; }
+* { box-sizing: border-box; margin: 0; }
+html, body { background: var(--page); color: var(--ink); font: 400 22px/1.45 Geist, system-ui, sans-serif;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+section { width: 1280px; height: 720px; padding: 56px 72px; position: relative; overflow: hidden; page-break-after: always;
+  display: flex; flex-direction: column; }
+section::after { content: attr(data-n); position: absolute; right: 72px; bottom: 30px; font: 14px GeistMono; color: var(--muted); }
+.kick { font: 500 14px GeistMono; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 14px; }
+.crit { position: absolute; right: 72px; top: 52px; font: 500 12px GeistMono; letter-spacing: .08em; color: var(--muted);
+  border: 1px solid var(--rule); border-radius: 99px; padding: 5px 12px; }
+h1 { font: 400 116px/1 Serif; letter-spacing: -.01em; }
+h2 { font: 400 52px/1.05 Serif; margin-bottom: 28px; max-width: 1080px; }
+em { font-style: italic; color: var(--accent); }
+p.lead { font-size: 26px; color: var(--soft); max-width: 920px; }
+.grid { display: grid; gap: 18px; flex: 1; align-content: start; }
+.g2 { grid-template-columns: 1fr 1fr; } .g3 { grid-template-columns: repeat(3,1fr); } .g4 { grid-template-columns: repeat(4,1fr); }
+.card { background: var(--surface); border: 1px solid var(--rule); border-radius: 20px; padding: 22px 24px; }
+.card h3 { font: 600 20px Geist; margin-bottom: 6px; }
+.card p, .card li { font-size: 16.5px; color: var(--soft); line-height: 1.45; }
+.card ul { padding-left: 18px; } .card li { margin: 3px 0; }
+.num { font: 400 56px/1 Serif; color: var(--accent); margin-bottom: 6px; }
+.num.cool { color: var(--cool); } .num.warn { color: var(--warn); }
+.small { font-size: 14.5px; color: var(--muted); }
+.step { font: 500 13px GeistMono; color: var(--accent); margin-bottom: 8px; }
+.tag { display: inline-block; font: 500 13px GeistMono; padding: 6px 12px; border-radius: 99px; border: 1px solid var(--accent);
+  color: var(--accent); margin: 0 8px 8px 0; }
+.foot { margin-top: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 17px; }
+td, th { padding: 9px 12px; border-bottom: 1px solid var(--rule); text-align: left; }
+th { font: 500 12.5px GeistMono; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+td b { color: var(--accent); font-weight: 600; }
+.glow { position: absolute; width: 700px; height: 700px; border-radius: 50%; right: -200px; top: -200px;
+  background: radial-gradient(circle, rgba(158,227,95,.18), transparent 65%); }
+.flow { display: flex; align-items: stretch; gap: 10px; margin-bottom: 18px; }
+.flow .box { flex: 1; background: var(--surface); border: 1px solid var(--rule); border-radius: 16px; padding: 14px 16px; }
+.flow .box b { display: block; font: 600 16px Geist; margin-bottom: 4px; }
+.flow .box span { font-size: 13.5px; color: var(--soft); line-height: 1.4; display: block; }
+.flow .box.ai { border-color: var(--accent); }
+.flow .box.code { border-color: var(--cool); }
+.arrow { align-self: center; color: var(--muted); font: 20px GeistMono; }
+.legend { font: 12.5px GeistMono; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin: 0 6px 0 14px; vertical-align: middle; }
+</style>
+</head>
+<body>
+
+<!-- 1 -->
+<section data-n="01">
+  <div class="glow"></div>
+  <div class="kick">Problem statement · Sustainability</div>
+  <h1>Leaf<em>It</em></h1>
+  <p class="lead" style="margin-top:22px">Redesign your block. Leave it greener.<br>
+  A Gemini planning agent on a satellite-built digital twin of your neighbourhood: it tests where trees, cool roofs and shaded bus stops
+  cool people most, shows what each option costs, and turns the plan into a funding proposal and vendor quotes.</p>
+  <div class="foot"><span class="tag">Gemini · Vertex AI</span><span class="tag">Function calling + vision</span><span class="tag">Earth Engine</span><span class="tag">Google Maps Platform</span><span class="tag">Cloud Run</span>
+  <p class="small" style="margin-top:10px">Friendly Neighbourhood Devs</p></div>
+</section>
+
+<!-- 2 -->
+<section data-n="02">
+  <div class="crit">PROBLEM ALIGNMENT</div>
+  <div class="kick">The problem</div>
+  <h2>Cities are heating up, and the money to cool them is spent <em>blind</em>.</h2>
+  <div class="grid g3">
+    <div class="card"><div class="num warn">20 °C+</div><h3>Heat is hyper-local</h3><p>Sunlit pavement can be 20 °C hotter than the same street in tree shade. City-wide averages hide the blocks where people actually suffer: bus stops, markets, dense homes.</p></div>
+    <div class="card"><div class="num warn">?</div><h3>No way to test a plan</h3><p>Residents' associations, NGOs and ward officers choose between trees, cool roofs and shade by guesswork. Existing tools are dashboards: they show the heat, not which fix works where, for whom, at what cost.</p></div>
+    <div class="card"><div class="num warn">→</div><h3>Plans stall before action</h3><p>Even a good idea needs a costed plan, a funding pitch and local suppliers. Each is a separate manual job, so most plans never reach the street.</p></div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section data-n="03">
+  <div class="crit">PROBLEM ALIGNMENT · UX</div>
+  <div class="kick">The solution</div>
+  <h2>From a satellite map to a <em>funded, quoted</em> plan in one flow.</h2>
+  <div class="grid g4">
+    <div class="card"><div class="step">01 · FIND</div><h3>Draw your area</h3><p>Search a place on a Google satellite map and drag a box (200 m to 1 km²).</p></div>
+    <div class="card"><div class="step">02 · TWIN</div><h3>Real data, in seconds</h3><p>Surface heat, every building and its height, existing tree canopy, roads, residents and climate, built into a 2.5D twin.</p></div>
+    <div class="card"><div class="step">03 · PLAN</div><h3>Design with Gemini</h3><p>Place items by hand with live numbers, or brief the Gemini agent in plain words. It tests options and you browse and compare them all.</p></div>
+    <div class="card"><div class="step">04 · ACT</div><h3>Fund and build</h3><p>A bill of materials by species, a Gemini-drafted funding proposal, and real nurseries and contractors within 25 km with a ready quote message.</p></div>
+  </div>
+  <p class="small foot">Budget-aware throughout: one budget, a live "used / left" bar, and nothing can be placed or planned that the money can't pay for.</p>
+</section>
+
+<!-- 4 -->
+<section data-n="04">
+  <div class="crit">TECHNICAL IMPLEMENTATION</div>
+  <div class="kick">The data pipeline</div>
+  <h2>A digital twin built from <em>nine</em> real sources, not a mock-up.</h2>
+  <div class="grid g3">
+    <div class="card"><h3>Google Earth Engine</h3><ul>
+      <li>Landsat 8/9 surface heat, hot-season median of 3 years</li>
+      <li>ESA WorldCover 10 m land cover</li>
+      <li>Open Buildings v3 footprints + 2.5D heights</li>
+      <li>Meta/WRI 1 m tree-canopy height</li>
+      <li>WorldPop residents by age (children, over-65s)</li></ul></div>
+    <div class="card"><h3>Google Maps Platform</h3><ul>
+      <li>Places: landmarks (markets, schools, clinics, bus stops) and real vendors</li>
+      <li>Air Quality API: today's AQI</li>
+      <li>Map Tiles: satellite ground of the 3D twin</li></ul>
+      <h3 style="margin-top:12px">Open data</h3><ul>
+      <li>OpenStreetMap roads and carriageway widths</li>
+      <li>Open-Meteo weather + humidity normals (climate class)</li></ul></div>
+    <div class="card"><h3>A model that respects what is already there</h3><ul>
+      <li>Each new tree adds only what existing shade hasn't already done, including canopy in a 150 m ring around the box</li>
+      <li>Species grow in over years; surface, air and "where vulnerable people live" cooling are reported separately</li>
+      <li>Humid climates get an airflow spacing rule</li>
+      <li>Every coefficient is cited on an in-app Method page</li></ul></div>
+  </div>
+</section>
+
+<!-- 5 -->
+<section data-n="05">
+  <div class="crit">MEANINGFUL GEN AI · INNOVATION</div>
+  <div class="kick">The Gemini planning agent</div>
+  <h2>Gemini <em>decides</em>. The simulator <em>calculates</em>. Code <em>checks</em>.</h2>
+  <div class="flow">
+    <div class="box ai"><b>1 · See</b><span>Brief in plain words + budget, a place brief (zones, hotspots, canopy, residents, surroundings, climate) and two labelled maps: heat and canopy</span></div>
+    <div class="arrow">→</div>
+    <div class="box ai"><b>2 · Strategise</b><span>Calls <code>run_scenario</code> 2–4 times with different levers: goal, zones, landmarks, species, roofs for homes, bus shelters</span></div>
+    <div class="arrow">→</div>
+    <div class="box code"><b>3 · Self-critique</b><span><code>check_plan</code>: budget used, trees wasted in shade, hot or vulnerable zones left out, species mix</span></div>
+    <div class="arrow">→</div>
+    <div class="box code"><b>4 · Revise</b><span>Choosing a plan with &gt;10% of trees in existing shade is refused in code; Gemini must fix it (up to 2 rounds)</span></div>
+    <div class="arrow">→</div>
+    <div class="box ai"><b>5 · Explain</b><span>Structured JSON answer: headline, trade-offs, zone-by-zone actions, caveats</span></div>
+  </div>
+  <div class="legend"><i style="background:var(--accent)"></i>Gemini (function calling, vision, thinking)<i style="background:var(--cool)"></i>deterministic code: optimiser, simulator, checks</div>
+  <div class="grid g3" style="margin-top:16px">
+    <div class="card"><h3>Numbers guardrail</h3><p>Every figure in Gemini's prose is matched against tool outputs (allowing ₹ lakh/crore, kg↔t, % rescaling). Anything unmatched is shown to the user as "not from the simulator".</p></div>
+    <div class="card"><h3>Weighs what can't be scored</h3><p>Trees cool streets, cool roofs cool the rooms below, shelters shade people waiting. No single number ranks them; Gemini weighs them against the brief.</p></div>
+    <div class="card"><h3>Honest by design</h3><p>No hidden fallback: if Gemini is unavailable the planner says so instead of inventing a plan. Every option tested is returned and browsable.</p></div>
+  </div>
+</section>
+
+<!-- 6 -->
+<section data-n="06">
+  <div class="crit">MEANINGFUL GEN AI</div>
+  <div class="kick">Gemini, end to end</div>
+  <h2>Two Gemini workflows, each <em>grounded</em> in the simulator.</h2>
+  <div class="grid g2">
+    <div class="card"><h3>1 · Planning agent <span class="small">(Studio → "Ask AI to plan")</span></h3><ul>
+      <li>Multimodal: text brief + place brief JSON + two generated map images with the same 3×3 zone grid as the tools</li>
+      <li>5 function tools, up to 16 turns, configurable thinking budget</li>
+      <li>Returns every option it tested with what goes where: tree species per zone, roofs, shelters, nearby roads and landmarks</li>
+      <li>Apply Gemini's pick or any other option; all of them land in Plan Options to compare side by side</li>
+      <li>"About this plan" card stays reachable on the map, with Show-zone highlighting</li></ul></div>
+    <div class="card"><h3>2 · Funding-proposal writer <span class="small">(Review → "Write the proposal")</span></h3><ul>
+      <li>Drafts a one-page proposal for a municipal officer or CSR committee from the saved plan only</li>
+      <li>Place-aware: climate, existing canopy, species chosen, residents and vulnerable residents who benefit</li>
+      <li>Money is pre-formatted in the reader's currency (14 currencies) so the model never does arithmetic</li>
+      <li>Same numbers guardrail; the draft header says if any figure needs checking</li></ul>
+      <h3 style="margin-top:14px">Runs on Vertex AI</h3><p>On Cloud Run, Gemini is called through Vertex AI as the service account: no API key in the deployment. Rate-limit replies are waited out, not failed.</p></div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section data-n="07">
+  <div class="crit">IMPACT</div>
+  <div class="kick">What the agent compares · Lajpat Nagar Central Market, New Delhi · ₹20 L · year 10</div>
+  <h2>Different options serve <em>different people</em>.</h2>
+  <div class="card" style="flex:0">
+    <table>
+      <tr><th>Option tested</th><th>Mix</th><th>Street cooling</th><th>Hottest spot</th><th>Still too hot</th><th>CO₂ / yr</th><th>Who else benefits</th></tr>
+      <tr><td>Whole-area cooling</td><td>666 trees · 5 roofs</td><td><b>−0.29 °C</b></td><td>−1.9 °C</td><td>17%</td><td><b>9.4 t</b></td><td>cheapest per degree (₹68 L/°C)</td></tr>
+      <tr><td>Hottest ground first</td><td>666 trees</td><td>−0.21 °C</td><td><b>−2.4 °C</b></td><td><b>13%</b></td><td>8.0 t</td><td>the hottest outdoor spots</td></tr>
+      <tr><td>Homes and bus stops</td><td>233 trees · 51 roofs · 1 shelter</td><td>−0.11 °C</td><td>−1.8 °C</td><td>21%</td><td>3.4 t</td><td><b>620 residents</b> under cool roofs, −0.18 °C where vulnerable people live, 1 shaded bus stop</td></tr>
+    </table>
+  </div>
+  <p class="lead" style="font-size:19px;margin-top:18px;max-width:1100px">A single "most cooling" number would always pick the first row. LeafIt's agent picks the row that matches the brief and says why. Every figure above is from the simulator; species are matched to Delhi's hot-dry climate (Neem, Arjun, Amaltas, Indian coral tree).</p>
+  <div class="foot" style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;border-top:1px solid var(--rule);padding-top:14px;margin-bottom:22px">
+    <p class="small"><b style="color:var(--ink)">Residents &amp; RWAs</b><br>a costed plan for their own block</p>
+    <p class="small"><b style="color:var(--ink)">Municipal officers</b><br>cooling per rupee, by zone</p>
+    <p class="small"><b style="color:var(--ink)">NGOs &amp; CSR teams</b><br>a sourced funding proposal</p>
+    <p class="small"><b style="color:var(--ink)">Local vendors</b><br>itemised quote requests</p>
+  </div>
+</section>
+
+<!-- 8 -->
+<section data-n="08">
+  <div class="crit">INNOVATION & CREATIVITY</div>
+  <div class="kick">What's new here</div>
+  <h2>Beyond a chatbot on a dashboard.</h2>
+  <div class="grid g3">
+    <div class="card"><h3>An agent with levers, not a prompt</h3><p>Gemini operates a real optimiser and simulator through function calls, the way a planner would use a spreadsheet, and must defend its choice.</p></div>
+    <div class="card"><h3>Self-critique enforced in code</h3><p>The agent's own check report can block its choice. The revision loop is real: a wasteful plan cannot be recommended.</p></div>
+    <div class="card"><h3>It sees the place</h3><p>Generated heat and canopy maps, labelled with the tools' zone grid, let Gemini reason about "the hot north-east corner beside the market".</p></div>
+    <div class="card"><h3>Existing shade counts</h3><p>The twin knows today's trees from 1 m canopy height, so new trees go where they add shade, not where shade already is.</p></div>
+    <div class="card"><h3>Equity built in</h3><p>WorldPop age data turns into "cooling where children and over-65s live", a number the agent can plan for.</p></div>
+    <div class="card"><h3>Plan → money → people</h3><p>The same session ends in a funding proposal and real vendors with a WhatsApp-ready quote.</p></div>
+  </div>
+</section>
+
+<!-- 9 -->
+<section data-n="09">
+  <div class="crit">TECHNICAL · UX</div>
+  <div class="kick">Built properly</div>
+  <h2>It works today, on <em>Google Cloud</em>.</h2>
+  <div class="grid g3">
+    <div class="card"><div class="num">Live</div><h3>Cloud Run + Vertex AI</h3><p>One container serves API + web app. Cloud Build → Artifact Registry → Cloud Run in one script. No keys in the deployment: Gemini and Earth Engine use the service account.</p></div>
+    <div class="card"><div class="num cool">156</div><h3>Automated tests</h3><p>113 backend + 43 frontend, all offline: simulator physics, the agent loop with a scripted Gemini, the numbers guardrail, plan → BOM → vendors. One shared model file keeps browser and server simulators identical.</p></div>
+    <div class="card"><div class="num">Fast</div><h3>Instant feedback</h3><p>The simulator runs in a Web Worker on every placement; the 3D scene renders only when something changes. Built areas are cached.</p></div>
+  </div>
+  <div class="grid g2 foot" style="flex:0">
+    <div class="card"><h3>Usable and accessible</h3><p>Plain-language AI brief, live budget used/left, keyboard shortcuts, ARIA labels and focus states, light and dark themes, 14 currencies.</p></div>
+    <div class="card"><h3>Every screen, every size</h3><p>Tested from 375 px phones to 3440 px ultrawide: no sideways scrolling, content centred, a sheet-style UI on phones.</p></div>
+  </div>
+</section>
+
+<!-- 10 -->
+<section data-n="10">
+  <div class="crit">SCALABILITY & SUSTAINABILITY</div>
+  <div class="kick">Scale & roadmap</div>
+  <h2>From one block to every ward.</h2>
+  <div class="grid g3">
+    <div class="card"><h3>Reach</h3><p>Works wherever Google Open Buildings has data: Africa, South and Southeast Asia, Latin America, which covers many of the world's fastest-heating cities. Prices, budget and currency are editable for any market.</p></div>
+    <div class="card"><h3>Scales on Google Cloud</h3><p>Stateless, autoscaling Cloud Run; Vertex AI with no free-tier limits; the area and plan cache moves to Firestore / Cloud Storage by re-implementing one repository layer.</p></div>
+    <div class="card"><h3>Next</h3><ul><li>Ward-level heat-priority maps for municipalities</li><li>More interventions: green walls, permeable paving, water</li><li>Track planted trees against the plan with fresh imagery</li><li>Verified vendor marketplace</li></ul></div>
+  </div>
+  <p class="small foot">Sustainable to run: the heavy maths runs in the user's browser; the server only builds areas, saves plans and calls Gemini.</p>
+</section>
+
+<!-- 11 -->
+<section data-n="11">
+  <div class="glow"></div>
+  <div class="kick">Try it</div>
+  <h1 style="font-size:92px">Leave your block <em>greener</em>.</h1>
+  <div class="grid g2" style="margin-top:44px; flex:0">
+    <div class="card"><h3>Live prototype</h3><p style="font-family:GeistMono">{{LIVE_URL}}</p></div>
+    <div class="card"><h3>3-minute demo</h3><p style="font-family:GeistMono">{{VIDEO_URL}}</p></div>
+  </div>
+  <p class="small foot">Category: Sustainability · Friendly Neighbourhood Devs</p>
+</section>
+
+</body>
+</html>

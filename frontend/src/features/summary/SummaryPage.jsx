@@ -41,6 +41,7 @@ export default function SummaryPage() {
   const [writing, setWriting]   = useState(false);
   const [proposal, setProposal] = useState(null);
   const [propSource, setPropSource] = useState(null);
+  const [propUnverified, setPropUnverified] = useState([]);   // figures in Gemini's draft that no simulator output contains
   const [error, setError]       = useState(null);
   const { metrics, breakdown, cooling } = canon ?? {};
 
@@ -84,6 +85,7 @@ export default function SummaryPage() {
       const res = await endpoints.planProposal(planId, displayCurrency().code);
       setProposal(res.text);
       setPropSource(res.source);
+      setPropUnverified(res.unverified_numbers ?? []);
       setShowProposal(true);
     } catch (e) {
       setError(e.message);
@@ -224,7 +226,7 @@ export default function SummaryPage() {
               <Pill label="Copy text" icon={Copy} kind="outline" dense onClick={() => { navigator.clipboard.writeText(proposal); toast('Proposal copied'); }} />
               <Pill label="Print / PDF" icon={Printer} kind="outline" dense onClick={() => window.print()} />
             </div>
-            <ProposalDocument text={proposal} gemini={propSource === 'gemini'} />
+            <ProposalDocument text={proposal} gemini={propSource === 'gemini'} unverified={propUnverified} />
           </Dialog>
         )}
       </AnimatePresence>
@@ -233,7 +235,7 @@ export default function SummaryPage() {
 }
 
 // ── ProposalDocument ───────────────────────────────────────────────────────────
-function ProposalDocument({ text, gemini }) {
+function ProposalDocument({ text, gemini, unverified = [] }) {
   const _ink  = '#1C211D';
   const _soft = '#4C544B';
 
@@ -257,7 +259,10 @@ function ProposalDocument({ text, gemini }) {
 
   return (
     <article style={{ background: 'var(--paper)', borderRadius: 18, padding: '22px 30px 30px' }}>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: _soft, marginBottom: 8 }}>{gemini ? 'DRAFTED BY GEMINI · NUMBERS CHECKED' : 'TEMPLATE DRAFT'}</div>
+      {/* "checked" only when the check passed: a figure Gemini wrote that no simulator output contains is named, not hidden */}
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: unverified.length ? '#B4471A' : _soft, marginBottom: 8 }}>
+        {!gemini ? 'TEMPLATE DRAFT' : unverified.length ? `DRAFTED BY GEMINI · NOT FROM THE SIMULATOR, CHECK BEFORE SENDING: ${unverified.join(', ')}` : 'DRAFTED BY GEMINI · EVERY NUMBER CHECKED AGAINST THE SIMULATOR'}
+      </div>
       {blocks}
     </article>
   );

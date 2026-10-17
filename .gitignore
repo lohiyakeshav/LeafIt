@@ -1,7 +1,9 @@
 # Only what is needed to build, run and test LeafIt is committed. Everything below stays on disk, untracked.
 
 # Working docs and internal notes (PRD, plan, decisions, architecture notes, per-package guides)
-docs/
+# The hackathon submission (deck, its PDF, submission notes) is the exception: it is committed.
+docs/*
+!docs/submission/
 ARCHITECTURE.md
 backend/README.md
 frontend/README.md

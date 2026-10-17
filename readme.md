@@ -67,9 +67,10 @@ After changing the model on purpose: edit `shared/model.json`, then `.venv/bin/p
 | `GOOGLE_APPLICATION_CREDENTIALS` | backend env | Path to the Earth Engine service-account key. Defaults to `EarthCredentials.json` at the repo root |
 | `EE_PROJECT` | backend env | Earth Engine cloud project (defaults to the key's project) |
 | `GOOGLE_MAPS_SERVER_KEY` | backend env | Places (landmarks and real nearby vendors) and Air Quality. Without it there are no landmarks, no vendors and no AQI figure (nothing is made up) |
-| `GEMINI_API_KEY` | backend env | Planner agent and funding proposals. Without it the planner uses simple rules and proposals use a template |
+| `GEMINI_API_KEY` | backend env | Google AI Studio key for the planner agent and funding proposals. Without Gemini the planner returns a clear 503 (no made-up plan) and proposals use a labelled template |
+| `GOOGLE_CLOUD_PROJECT` | backend env | Use Gemini on Vertex AI with the runtime service account instead of a key (what `deploy.sh` sets on Cloud Run); `GOOGLE_CLOUD_LOCATION` defaults to `global` |
 | `LEAFIT_VERTEX_CREDENTIALS` | backend env | Use Vertex AI (billed to a project, no free-tier rate limits) with this service-account key, path relative to `backend/`. `LEAFIT_GEMINI_BACKEND=studio\|vertex` picks one when both this and `GEMINI_API_KEY` are set (default prefers the key). Key files named `*vertex*.json` are git-ignored |
-| `LEAFIT_GEMINI_MODEL` | backend env | Model for the proposal and photo-audit writers (default `gemini-2.5-flash`) |
+| `LEAFIT_GEMINI_MODEL` | backend env | Model for the proposal writer (default `gemini-2.5-flash`) |
 | `LEAFIT_PLANNER_MODEL` | backend env | Model for the planner agent (defaults to `LEAFIT_GEMINI_MODEL`); `LEAFIT_PLANNER_THINKING` sets its reasoning-token budget (default 1024, 0 = off) |
 
 Templates: `frontend/.env.example`, `backend/.env.example`. Real keys are never committed: `.env*` files and credential JSON files are excluded from git, Docker builds and `gcloud --source` uploads.
@@ -78,11 +79,13 @@ Templates: `frontend/.env.example`, `backend/.env.example`. Real keys are never 
 ## Deploy (Cloud Run)
 
 ```bash
-docker build --build-arg VITE_GOOGLE_MAPS_API_KEY=<browser key> -t leafit .
-docker run -p 8080:8080 -e GEMINI_API_KEY=... -e EE_PROJECT=... leafit
+gcloud auth login
+./deploy.sh          # Cloud Build -> Artifact Registry -> Cloud Run (asia-south1); PROJECT / REGION / SA can be overridden
 ```
 
-One container serves the API and the built web app. On Cloud Run, do not ship a key file: attach a service account (with the two Earth Engine roles above) to the service. Built areas are cached on local disk, which Cloud Run loses on restart; re-implement `backend/app/repositories/` on Firestore or GCS when that matters.
+One container serves the API and the built web app. No Gemini key or key file ships: Gemini runs on Vertex AI and Earth Engine reads
+satellites as the service's runtime service account (Earth Engine + Service Usage roles; `deploy.sh` adds `roles/aiplatform.user`).
+Add the `run.app` URL to the browser Maps key's allowed referrers. Local Docker: `docker build --build-arg VITE_GOOGLE_MAPS_API_KEY=<browser key> -t leafit .` Built areas are cached on local disk, which Cloud Run loses on restart; re-implement `backend/app/repositories/` on Firestore or GCS when that matters.
 
 ## The sample area
 
@@ -100,7 +103,7 @@ this sample too.
 
 ## Evaluating the planner
 
-`backend/scripts/agent_eval.py` builds Lajpat Nagar and Gachibowli from real data (cached in `backend/data/eval_areas`) and runs six briefs through the Gemini agent and the offline rules planner. It prints per run: trees on already-shaded ground, zones and species used, numbers in the prose that no tool produced, surface / air / equity cooling, cost per degree and seconds. Free-tier Gemini keys allow about five requests a minute per model, so a full run takes a while; the client waits out rate-limit replies instead of failing.
+`backend/scripts/agent_eval.py` builds Lajpat Nagar and Gachibowli from real data (cached in `backend/data/eval_areas`) and runs six briefs through the Gemini agent. It prints per run: trees on already-shaded ground, zones and species used, numbers in the prose that no tool produced, surface / air / equity cooling, cost per degree and seconds. Free-tier Gemini keys allow about five requests a minute per model, so a full run takes a while; the client waits out rate-limit replies instead of failing.
 
 ## Known limits
 

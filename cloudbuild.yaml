@@ -1,0 +1,5 @@
+# Used by deploy.sh: `gcloud builds submit` can't pass --build-arg on its own.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: [build, --build-arg, VITE_GOOGLE_MAPS_API_KEY=${_MAPS_KEY}, -t, $_IMAGE, .]
+images: [$_IMAGE]
