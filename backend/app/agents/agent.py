@@ -21,7 +21,7 @@ from app.domain import plantable, zones
 from app.domain import species as species_mod
 from app.domain.optimise import optimise
 from app.domain.sim import Block, simulate
-from app.integrations.gemini import PLANNER_MODEL, PLANNER_THINKING, client, generate, unverified_numbers
+from app.integrations.gemini import PLANNER_MODEL, PLANNER_THINKING, DailyLimitReached, client, generate, unverified_numbers
 
 MAX_TURNS = 16
 MAX_REVISIONS = 2     # a plan refused for wasting trees may be redone this many times; after that the best checked plan wins
@@ -301,6 +301,8 @@ def plan(block: Block, brief: str, budget: float, years: int = 10, llm=None, uni
     s = Session(block, budget, years, unit_cost)
     try:
         answer = _gemini(s, brief, llm)
+    except DailyLimitReached as e:
+        raise PlannerUnavailable(str(e)) from e
     except Exception as e:
         logging.exception("Gemini planner failed")
         raise PlannerUnavailable("The AI planner couldn't finish this time. Please try again.") from e

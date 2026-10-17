@@ -13,7 +13,9 @@ Nothing configured -> client() returns None and every feature falls back to its 
 import json
 import os
 import re
+import threading
 import time
+from datetime import date
 from pathlib import Path
 
 from google import genai
@@ -64,6 +66,28 @@ def _retry_after(e: Exception) -> float:
     return (float(m.group(1)) / (1000 if m.group(2) == "ms" else 1)) if m else 15.0
 
 
+# Spending guard: at most this many Gemini calls a day (one AI plan is ~6-12 calls, a proposal 1). Past it, AI features say so
+# until midnight UTC instead of spending more. 0 = no limit.
+# ponytail: counted per server instance (Cloud Run max instances × this is the real ceiling); a shared counter needs Firestore.
+DAILY_CALL_LIMIT = int(os.environ.get("LEAFIT_GEMINI_DAILY_CALLS", "600"))
+_spend_lock, _spend_day, _spend_calls = threading.Lock(), None, 0
+
+
+class DailyLimitReached(Exception):
+    """Today's Gemini allowance is used up. Message is user-safe."""
+
+
+def _count_call() -> None:
+    global _spend_day, _spend_calls
+    with _spend_lock:
+        today = date.today()
+        if today != _spend_day:
+            _spend_day, _spend_calls = today, 0
+        if DAILY_CALL_LIMIT and _spend_calls >= DAILY_CALL_LIMIT:
+            raise DailyLimitReached("Today's AI allowance for this demo is used up. Please try again tomorrow.")
+        _spend_calls += 1
+
+
 def generate(llm, **kwargs):
     """llm.models.generate_content, riding out a per-minute rate limit (429) or a busy/failing model (500, 503) instead of
     failing the whole plan.
@@ -71,6 +95,7 @@ def generate(llm, **kwargs):
     The server's own "retry in N s" is honoured (capped); a daily quota (it won't reset in time), a long wait or any other
     error is raised as before.
     """
+    _count_call()
     for attempt in range(RATE_LIMIT_RETRIES + 1):
         try:
             return llm.models.generate_content(**kwargs)

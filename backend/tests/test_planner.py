@@ -180,3 +180,13 @@ def test_vendor_lookups_reject_ids_that_are_not_places_ids(monkeypatch):
     assert calls == []                                                                   # none of those reached Google
     assert vendors.get("nursery:ChIJabcdefghij") is None and vendors.get("nursery:ChIJabcdefghij") is None
     assert len(calls) == 1                                                               # a miss is remembered, not re-billed
+
+
+def test_the_daily_gemini_allowance_stops_spending(block, monkeypatch):
+    from app.integrations import gemini
+    monkeypatch.setattr(gemini, "DAILY_CALL_LIMIT", 2)
+    monkeypatch.setattr(gemini, "_spend_day", None)
+    llm = FakeLLM([reply(call("get_place_brief"))] * 5)
+    with pytest.raises(agent.PlannerUnavailable, match="allowance"):   # the third call is refused before it reaches Gemini
+        agent.plan(block, "hot streets", 500_000, llm=llm)
+    assert len(llm.seen) == 2

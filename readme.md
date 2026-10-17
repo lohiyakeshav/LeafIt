@@ -66,11 +66,13 @@ After changing the model on purpose: edit `shared/model.json`, then `.venv/bin/p
 | `VITE_GOOGLE_MAPS_API_KEY` | `frontend/.env.local` | Browser key: Maps JavaScript, Places (New), Map Tiles |
 | `GOOGLE_MAPS_BROWSER_KEY` | backend env | The same browser key, served to the web app at runtime (`/config.js`); use it when the image is built without the build arg, e.g. Cloud Run's deploy-from-GitHub |
 | `GOOGLE_APPLICATION_CREDENTIALS` | backend env | Path to the Earth Engine service-account key. Defaults to `EarthCredentials.json` at the repo root |
+| `EE_KEY_FILE` | backend env | Earth Engine key path read by Earth Engine only (wins over `GOOGLE_APPLICATION_CREDENTIALS`). Use it on Cloud Run when the key comes from another project, mounted as a secret, so Gemini on Vertex keeps the service's own identity |
 | `EE_PROJECT` | backend env | Earth Engine cloud project (defaults to the key's project) |
 | `GOOGLE_MAPS_SERVER_KEY` | backend env | Places (landmarks and real nearby vendors) and Air Quality. Without it there are no landmarks, no vendors and no AQI figure (nothing is made up) |
 | `GEMINI_API_KEY` | backend env | Google AI Studio key for the planner agent and funding proposals. Without Gemini the planner returns a clear 503 (no made-up plan) and proposals use a labelled template |
 | `GOOGLE_CLOUD_PROJECT` | backend env | Use Gemini on Vertex AI with the runtime service account instead of a key (what `deploy.sh` sets on Cloud Run); `GOOGLE_CLOUD_LOCATION` defaults to `global` |
 | `LEAFIT_VERTEX_CREDENTIALS` | backend env | Use Vertex AI (billed to a project, no free-tier rate limits) with this service-account key, path relative to `backend/`. `LEAFIT_GEMINI_BACKEND=studio\|vertex` picks one when both this and `GEMINI_API_KEY` are set (default prefers the key). Key files named `*vertex*.json` are git-ignored |
+| `LEAFIT_GEMINI_DAILY_CALLS` | backend env | Spending guard: Gemini calls allowed per day per server instance (default 600, about 50–100 AI plans; 0 = no limit). Past it, the planner says so and proposals use the template |
 | `LEAFIT_GEMINI_MODEL` | backend env | Model for the proposal writer (default `gemini-2.5-flash`) |
 | `LEAFIT_PLANNER_MODEL` | backend env | Model for the planner agent (defaults to `LEAFIT_GEMINI_MODEL`); `LEAFIT_PLANNER_THINKING` sets its reasoning-token budget (default 1024, 0 = off) |
 

@@ -27,7 +27,9 @@ AREA_TTL_DAYS = float(os.environ.get("LEAFIT_AREA_TTL_DAYS", 30))    # rebuilt f
 WEB_DIR = Path(os.environ.get("LEAFIT_WEB_DIR", ROOT / "frontend/dist"))
 
 EE_PROJECT = os.environ.get("EE_PROJECT")  # Earth Engine cloud project; falls back to the service account's project
-_key = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS") or str(ROOT / "EarthCredentials.json")  # git-ignored service-account key
+# Earth Engine service-account key (git-ignored). EE_KEY_FILE is read only here, unlike GOOGLE_APPLICATION_CREDENTIALS, which every
+# Google library picks up: on Cloud Run a key mounted from another project must not also become Vertex AI's identity.
+_key = os.environ.get("EE_KEY_FILE") or os.environ.get("GOOGLE_APPLICATION_CREDENTIALS") or str(ROOT / "EarthCredentials.json")
 EE_KEY_FILE = Path(_key)
 GOOGLE_MAPS_SERVER_KEY = os.environ.get("GOOGLE_MAPS_SERVER_KEY")  # Places / Air Quality (server side)
 # Browser Maps key, handed to the web app at runtime (/config.js), so an image built without it (e.g. Cloud Run's GitHub deploy) still
