@@ -1,13 +1,18 @@
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
+import { useCurrency } from '../state/currency.js';
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import HomePage from '../features/home/HomePage.jsx';
-import { AssumptionsPage, ExplorePage, StudioPage, SummaryPage, VendorsPage } from './lazyPages.js';
-import { Spinner, ToastProvider } from '../shared/UI.jsx';
+import { AssumptionsPage, ExplorePage, StudioPage, SummaryPage, VendorsPage } from './routes.js';
+import { Spinner, ToastProvider } from '../shared/ui';
 
 const Loading = () => <div style={{ height: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Spinner /></div>;
 const OldSimulatorLink = () => <Navigate to={`/block/${useParams().id}`} replace />;
 
 export default function App() {
+  // Subscribing here re-renders every page when the currency changes, so every amount (all via inr()) updates at once.
+  useCurrency((s) => s.code);
+  useCurrency((s) => s.rates);
+  useEffect(() => { useCurrency.getState().load(); }, []);
   return (
     <BrowserRouter>
       <div style={{ minHeight: '100dvh', background: 'var(--page)', color: 'var(--ink)' }}>

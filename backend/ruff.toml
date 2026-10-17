@@ -1,0 +1,11 @@
+line-length = 130
+target-version = "py312"
+extend-exclude = [".venv"]
+
+[lint]
+# pyflakes (undefined names, unused imports), pycodestyle errors, import order, and common bug patterns
+select = ["F", "E", "W", "I", "B", "UP"]
+ignore = ["E501", "E731", "B008"]   # long lines are allowed (formulas), small lambdas are idiomatic here, FastAPI uses call defaults
+
+[lint.isort]
+known-first-party = ["app"]

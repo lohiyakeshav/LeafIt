@@ -34,3 +34,10 @@ export const STREET_STYLE = [
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0E1A1F' }] },
   { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#4E6B78' }] },
 ];
+
+// Light theme street map: Google's own light cartography, minus the business pins and transit clutter.
+export const STREET_STYLE_LIGHT = [
+  { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+  { featureType: 'administrative.land_parcel', stylers: [{ visibility: 'off' }] },
+];

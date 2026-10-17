@@ -48,3 +48,19 @@ describe('browser simulator matches the Python one', () => {
     expect(() => validate(grid, [{ type: 'cool_roof', row: r, col: c }, { type: 'cool_roof', row: r, col: c }])).toThrow(/already/);
   });
 });
+
+describe('user-edited prices', () => {
+  const pl = [{ type: 'tree', row: 5, col: 5, count: 2 }];
+  it('change every cost figure, and only those', () => {
+    const base = simulate(grid, pl, 10), cheap = simulate(grid, pl, 10, { tree: 1500 });
+    expect(base.metrics.total_cost_inr).toBe(6000);
+    expect(cheap.metrics.total_cost_inr).toBe(3000);
+    expect(cheap.breakdown.unit_cost.tree).toBe(1500);
+    expect(cheap.metrics.cost_per_degree_inr).toBeCloseTo(base.metrics.cost_per_degree_inr / 2, -1);
+    expect(cheap.metrics.temp_reduction_c).toBe(base.metrics.temp_reduction_c);   // prices don't change physics
+  });
+  it('fall back to defaults when missing or invalid', () => {
+    expect(simulate(grid, pl, 10, { tree: 0 }).metrics.total_cost_inr).toBe(6000);
+    expect(simulate(grid, pl, 10, {}).metrics.total_cost_inr).toBe(6000);
+  });
+});

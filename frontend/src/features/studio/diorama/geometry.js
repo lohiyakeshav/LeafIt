@@ -1,5 +1,5 @@
 // Pure geometry for the diorama (no three.js here, so it is unit-tested without a GPU).
-// World axes: x = east, z = south, y = up, in metres from the area's north-west corner, matching backend/app/geodata/grid.py.
+// World axes: x = east, z = south, y = up, in metres from the area's north-west corner, matching backend/app/domain/area/grid.py.
 
 const hash = (a, b) => { let h = (a * 374761393 + b * 668265263) >>> 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 

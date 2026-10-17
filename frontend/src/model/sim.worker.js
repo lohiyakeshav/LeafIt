@@ -12,7 +12,7 @@ function flush() {
   latest = null;
   if (!job || !grid) return;
   try {
-    const out = simulate(grid, job.placements, job.years);
+    const out = simulate(grid, job.placements, job.years, job.unitCost);
     self.postMessage({ type: 'result', seq: job.seq, ...out }, [out.cooling.buffer]);
   } catch (e) {
     self.postMessage({ type: 'error', seq: job.seq, message: e.message });
