@@ -1,7 +1,8 @@
 """App factory: middleware, routers, and the built web app (one Cloud Run service serves both)."""
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -32,6 +33,14 @@ def create_app() -> FastAPI:
     deps.purge_expired()  # expired plans and areas go at start-up (and hourly while saving)
     if WEB_DIR.is_dir():  # registered last so API routes win
         app.mount("/", SPAFiles(directory=WEB_DIR, html=True), name="web")
+
+        @app.middleware("http")
+        async def pages_win_for_browsers(request: Request, call_next):
+            # Some page URLs are also API paths (/vendors, /assumptions). A browser loading or reloading the page asks for HTML;
+            # the app's own fetches don't, so they still reach the API.
+            if request.method == "GET" and "text/html" in request.headers.get("accept", "") and "." not in request.url.path.rsplit("/", 1)[-1]:
+                return FileResponse(WEB_DIR / "index.html")
+            return await call_next(request)
     return app
 
 

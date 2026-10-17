@@ -4,6 +4,7 @@ import { MessageCircle, Phone, Globe, MapPin, Star, Sprout, House, Bus } from 'l
 import { endpoints } from '../../api/endpoints.js';
 import { useBlock } from '../../api/useBlock.js';
 import { useSession } from '../../state/session.js';
+import { SPECIES_BY_ID } from '../../model/rules.js';
 import { Reveal, SectionHead, Spinner, Pill, ThemeToggle, useToast, Dialog } from '../../shared/ui';
 import AppBar from '../../shared/layout/AppBar.jsx';
 import { useWide } from '../../shared/layout/useWide.js';
@@ -97,7 +98,7 @@ export default function VendorsPage() {
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               {bom.map((it) => (
                 <div key={`${it.type}:${it.species ?? ''}`} style={{ padding: '10px 14px', border: '1px solid var(--rule)', borderRadius: 14 }}>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--muted)' }}>{CATS[it.category]?.tag ?? it.category}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--muted)' }}>{it.species && SPECIES_BY_ID[it.species] ? SPECIES_BY_ID[it.species].common.toUpperCase() : CATS[it.category]?.tag ?? it.category}</div>
                   <div style={{ fontSize: 15, fontWeight: 600, marginTop: 2 }}>{it.quantity} {it.unit}</div>
                 </div>
               ))}
@@ -121,11 +122,11 @@ export default function VendorsPage() {
           </p>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: wide ? '240px minmax(0, 1fr)' : '1fr', gap: wide ? 40 : 16, alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: wide ? '240px minmax(0, 1fr)' : 'minmax(0, 1fr)', gap: wide ? 40 : 16, alignItems: 'start' }}>
           {/* Filters: a sidebar on desktop, a scrolling chip row on phones */}
           <aside aria-label="Filter vendors" style={{ position: wide ? 'sticky' : 'static', top: 96 }}>
             {wide && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.04em', color: 'var(--muted)', marginBottom: 8 }}>CATEGORY</div>}
-            <div role="group" style={{ display: 'flex', flexDirection: wide ? 'column' : 'row', gap: wide ? 2 : 8, overflowX: wide ? 'visible' : 'auto', paddingBottom: wide ? 0 : 4 }}>{filters}</div>
+            <div role="group" style={{ display: 'flex', flexDirection: wide ? 'column' : 'row', gap: wide ? 2 : 8, overflowX: wide ? 'visible' : 'auto', scrollbarWidth: 'none', paddingBottom: wide ? 0 : 4 }}>{filters}</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.04em', color: 'var(--muted)', margin: wide ? '24px 0 8px' : '12px 0 8px' }}>SORT</div>
             <div role="group" style={{ display: 'flex', gap: 8 }}>
               {SORTS.map((s) => (

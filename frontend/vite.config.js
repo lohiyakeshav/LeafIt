@@ -16,7 +16,8 @@ export default defineConfig({
   server: {
     port: 5173,
     fs: { allow: ['..'] },
-    proxy: Object.fromEntries(apiRoutes.map(r => [`^/${r}(?:$|[/?])`, API])),
+    // a browser loading a page (it asks for HTML) gets the app, even where the page URL is also an API path (/vendors, /assumptions)
+    proxy: Object.fromEntries(apiRoutes.map(r => [`^/${r}(?:$|[/?])`, { target: API, bypass: (req) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined) }])),
   },
   test: { environment: 'node', include: ['src/**/*.test.js'] },
 });

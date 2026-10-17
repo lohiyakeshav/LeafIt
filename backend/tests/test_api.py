@@ -96,3 +96,16 @@ def test_species_survive_the_api_into_saved_plans_and_the_bill_of_materials(api,
     assert any("Neem" in i["item"] for i in api.get(f"/plans/{pid}/bom").json())
     bad = api.post("/simulate", json={"block_id": "lajpat_nagar", "placements": [{**pl[0], "species": "unicorn"}]})
     assert bad.status_code == 422
+
+
+def test_page_urls_that_are_also_api_paths_serve_the_app_to_browsers(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from app import main
+    (tmp_path / "index.html").write_text("<!doctype html><title>LeafIt</title>")
+    monkeypatch.setattr(main, "WEB_DIR", tmp_path)
+    client = TestClient(main.create_app())
+    page = client.get("/assumptions", headers={"accept": "text/html,application/xhtml+xml,*/*;q=0.8"})   # a reload of the page
+    assert page.status_code == 200 and "<title>LeafIt</title>" in page.text
+    assert isinstance(client.get("/assumptions").json(), list)                                   # the app's own fetch
+    assert client.get("/vendors", params={"block_id": "lajpat_nagar"}, headers={"accept": "text/html"}).text.startswith("<!doctype")

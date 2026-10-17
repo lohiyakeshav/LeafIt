@@ -21,9 +21,10 @@ export default function AppBar({ step, title, actions }) {
     <header data-noprint style={{ position: 'sticky', top: 0, zIndex: 30, background: 'color-mix(in srgb, var(--page) 88%, transparent)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderBottom: '1px solid var(--rule)' }}>
       <div style={{ maxWidth: 1320, margin: '0 auto', padding: wide ? '14px 40px' : '10px var(--gutter)', display: 'flex', alignItems: 'center', gap: 16 }}>
         <CircleBtn icon={ArrowLeft} tooltip="Back" onClick={() => navigate(-1)} />
-        <div style={{ minWidth: 0 }}>
+        {/* one line that shrinks: a long place name ends in "…" instead of running under the buttons */}
+        <div style={{ flex: wide ? '0 1 auto' : '1 1 auto', minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
           <button onClick={() => navigate('/')} style={{ fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 650, letterSpacing: '-0.02em' }}>LeafIt</button>
-          {title && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--muted)', marginLeft: 10, whiteSpace: 'nowrap' }}>/ {title}</span>}
+          {title && <span title={title} style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--muted)', marginLeft: 10 }}>/ {title}</span>}
         </div>
         {wide && (
           <nav aria-label="Steps" style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
@@ -46,8 +47,7 @@ export default function AppBar({ step, title, actions }) {
             </ol>
           </nav>
         )}
-        {!wide && <div style={{ flex: 1 }} />}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><CurrencyPicker />{actions}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}><CurrencyPicker />{actions}</div>
       </div>
     </header>
   );

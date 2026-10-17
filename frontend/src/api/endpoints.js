@@ -9,7 +9,7 @@ export const endpoints = {
   createArea: (bounds, name) => api.post('/areas', { bounds, name }),
   areaConditions: (id) => api.get(`/areas/${id}/conditions`),
   simulate: (blockId, placements, years, unitCost) => api.post('/simulate', { block_id: blockId, placements, years, unit_cost: unitCost ?? undefined }),
-  agentPlan: (body) => api.post('/agent', body),
+  agentPlan: (body) => api.post('/agent', body, 180_000),   // the planner makes several Gemini calls with thinking
   createPlan: (body) => api.post('/plans', body),
   planBom: (id) => api.get(`/plans/${id}/bom`),
   planProposal: (id, currency = 'INR') => api.post(`/plans/${id}/proposal`, { currency }),

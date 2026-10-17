@@ -43,7 +43,7 @@ class _AiSheetState extends State<AiSheet> {
   String? get _budgetError => budgetError(_budget.text);
 
   Future<void> _run() async {
-    if (_budgetError != null) return;
+    if (_budgetError != null || _brief.text.trim().isEmpty) return;
     final lakh = double.parse(_budget.text.trim());
     FocusScope.of(context).unfocus();
     widget.state.setBudget(lakh * 1e5);
@@ -55,7 +55,7 @@ class _AiSheetState extends State<AiSheet> {
     try {
       final res = await api.post('/agent', {
         'block_id': widget.state.block.id,
-        'brief': _brief.text.trim().isEmpty ? _examples.last : _brief.text.trim(),
+        'brief': _brief.text.trim(),
         'budget_inr': lakh * 1e5,
         'years': widget.state.years,
       });
@@ -88,6 +88,7 @@ class _AiSheetState extends State<AiSheet> {
             minLines: 2,
             maxLines: 4,
             maxLength: 500,
+            onChanged: (_) => setState(() {}), // the Plan button needs a brief
             style: geist(16, height: 1.45),
             decoration: const InputDecoration(hintText: 'e.g. Protect elderly shoppers near the market, leave roofs alone'),
           ),
@@ -124,7 +125,7 @@ class _AiSheetState extends State<AiSheet> {
           ),
           const SizedBox(height: 18),
           Pill(_loading ? 'Testing options' : 'Plan it',
-              icon: Icons.auto_awesome, expand: true, loading: _loading, onTap: _budgetError == null ? _run : null),
+              icon: Icons.auto_awesome, expand: true, loading: _loading, onTap: _budgetError == null && _brief.text.trim().isNotEmpty && !_loading ? _run : null),
           AnimatedSize(
             duration: Motion.med,
             curve: Motion.ease,

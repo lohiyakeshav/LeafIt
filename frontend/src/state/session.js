@@ -4,7 +4,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 const HISTORY_LIMIT = 200;
-const MAX_OPTIONS = 4;
+const MAX_OPTIONS = 6;   // room for the AI's options (up to 4) next to the user's own plans
 
 export const useSession = create(
   persist(
@@ -19,7 +19,7 @@ export const useSession = create(
       budget: 2_000_000,
       unitCost: null,   // user-edited prices { tree, cool_roof, shade_stop } in ₹; null = the sourced defaults
       plan: null,       // { id, bom } once the user has reviewed the plan
-      options: [],      // saved plan variants to compare: [{ id, label, items, years, metrics }]
+      options: [],      // saved plan variants to compare: [{ id, label, items, years, metrics, ai? }]; ai = { pick, answer, summary } for AI options
 
       /** Switch to another block/area: a different place starts with an empty plan. */
       openBlock: (id) => { if (get().blockId !== id) set({ blockId: id, items: [], history: [], plan: null, options: [] }); },
@@ -43,6 +43,8 @@ export const useSession = create(
         const opt = { id: `${Date.now().toString(36)}`, label: name, items: s.items, years: s.years, metrics };
         return { options: [...s.options, opt].slice(-MAX_OPTIONS) };
       }),
+      /** The options from one AI run: they replace the previous run's (keeping the user's own), newest MAX_OPTIONS kept. */
+      addAiOptions: (opts) => set((s) => ({ options: [...s.options.filter((o) => !o.ai), ...opts].slice(-MAX_OPTIONS) })),
       loadOption: (id) => { const o = get().options.find((x) => x.id === id); if (o) { get().setItems(o.items); set({ years: o.years }); } },
       removeOption: (id) => set((s) => ({ options: s.options.filter((o) => o.id !== id) })),
     }),

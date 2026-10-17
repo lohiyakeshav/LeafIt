@@ -10,11 +10,11 @@ class ApiError extends Error {
   }
 }
 
-async function _send(request) {
+async function _send(request, timeoutMs = 60_000) {
   let res;
   try {
     const controller = new AbortController();
-    const tid = setTimeout(() => controller.abort(), 60_000);
+    const tid = setTimeout(() => controller.abort(), timeoutMs);
     res = await request(controller.signal);
     clearTimeout(tid);
   } catch (e) {
@@ -36,13 +36,13 @@ export const api = {
     Object.entries(query).forEach(([k, v]) => v != null && url.searchParams.set(k, v));
     return _send(signal => fetch(url.toString(), { signal }));
   },
-  post: (path, body) =>
+  post: (path, body, timeoutMs) =>
     _send(signal => fetch(API_BASE + path, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
       signal,
-    })),
+    }), timeoutMs),
 };
 
 export { ApiError };

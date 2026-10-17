@@ -114,6 +114,16 @@ export function validate(grid, placements) {
 /** unitCost: the user's prices ({ tree, cool_roof, shade_stop } in ₹); anything missing uses the sourced default. */
 export const prices = (unitCost) => Object.fromEntries(Object.entries(TYPES).map(([t, v]) => [t, Number(unitCost?.[t]) || v.cost]));
 
+/** What cell-form `placements` cost in ₹, priced exactly as simulate() does; cheap enough to run before every placement. */
+export function planCost(grid, placements, unitCost = null) {
+  const price = prices(unitCost);
+  let cost = 0;
+  for (const p of placements) {
+    cost += p.type === 'tree' ? (p.count ?? 1) * price.tree : p.type === 'cool_roof' ? grid.roof[p.row * grid.cols + p.col] * price.cool_roof : price.shade_stop;
+  }
+  return cost;
+}
+
 /** Mean cooling where exposure is highest (top quartile of outdoor cells), or null without population data. */
 function equity(grid, street, outdoor) {
   const { exposure } = grid;

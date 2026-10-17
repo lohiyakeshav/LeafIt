@@ -93,6 +93,7 @@ export default function SummaryPage() {
   }
 
   const wide = useWide();
+  const roomy = useWide(520);   // three result tiles a row; two on a phone, so labels like STREET COOLING fit
   const noPlan = !blockId || !placements.length;
   const blockName = block?.name ?? '';
   const barActions = <ThemeToggle />;
@@ -190,11 +191,11 @@ export default function SummaryPage() {
         </div>
 
         {/* map column sized from the map (as tall as the screen allows), the panel takes the rest: no dead gap between them */}
-        <div style={{ display: 'grid', gridTemplateColumns: wide ? `minmax(0, calc((100dvh - 330px) * ${block.cols / block.rows})) minmax(380px, 1fr)` : '1fr', gap: wide ? 36 : 24, alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: wide ? `minmax(0, calc((100dvh - 330px) * ${block.cols / block.rows})) minmax(380px, 1fr)` : 'minmax(0, 1fr)', gap: wide ? 36 : 24, alignItems: 'start' }}>
           <Reveal delay={0.1}><PlanCompare block={block} placements={placements} cooling={cooling} years={years} maxMapHeight={wide ? 'calc(100dvh - 330px)' : '70dvh'} /></Reveal>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <section aria-label="Results" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 1, background: 'var(--rule)', border: '1px solid var(--rule)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+            <section aria-label="Results" style={{ display: 'grid', gridTemplateColumns: `repeat(${roomy ? 3 : 2}, minmax(0, 1fr))`, gap: 1, background: 'var(--rule)', border: '1px solid var(--rule)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
               {kpis.map(([key, label, value, sub], i) => (
                 <button key={label} onClick={() => setWhyKey(key)} title={`How is ${label.toLowerCase()} calculated?`}
                   style={{ background: 'var(--surface)', padding: '14px 14px 12px', textAlign: 'left', minWidth: 0 }}>

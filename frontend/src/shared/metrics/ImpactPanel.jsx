@@ -9,7 +9,7 @@ const n = (src, k) => Number(src?.[k] ?? 0);
 const NUM = { fontFamily: 'var(--font-sans)', fontWeight: 600, lineHeight: 1, fontVariantNumeric: 'tabular-nums' };
 const deg = (v, d = 2) => `${Math.abs(v) >= 0.5 * 10 ** -d ? '−' : ''}${Math.abs(v).toFixed(d)}°`;
 
-export function ImpactPanel({ metrics: m, breakdown: b, budget, years, busy, compact = false, onInfo, kicker = 'LIVE ESTIMATE' }) {
+export function ImpactPanel({ metrics: m, breakdown: b, budget, years, busy, error, compact = false, onInfo, kicker = 'LIVE ESTIMATE' }) {
   const cool = n(m, 'temp_reduction_c'), peak = n(m, 'peak_reduction_c');
   const aqi = n(m, 'aqi_change'), co2 = n(m, 'co2_captured_kg_per_year');
   const cost = n(m, 'total_cost_inr');
@@ -25,6 +25,13 @@ export function ImpactPanel({ metrics: m, breakdown: b, budget, years, busy, com
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, ...LABEL }}>
           {busy ? <Spinner size={10} /> : <span style={{ width: 6, height: 6, borderRadius: 3, background: 'var(--accent)' }} />}
           {kicker} · YEAR {years}
+        </div>
+      )}
+
+      {/* The numbers below are only true when the plan could be simulated: say so loudly, never show zeros as if real */}
+      {error && (
+        <div role="alert" style={{ padding: '12px 14px', borderRadius: 14, border: '1px solid var(--warn)', color: 'var(--warn)', fontSize: 13, lineHeight: 1.45 }}>
+          <b>Can't estimate this plan.</b> {error}. Undo or erase that item; the numbers below are not up to date.
         </div>
       )}
 
@@ -80,7 +87,12 @@ export function ImpactPanel({ metrics: m, breakdown: b, budget, years, busy, com
           <motion.div animate={{ width: `${Math.min(1, budget ? cost / budget : 0) * 100}%` }} transition={{ duration: 0.65, ease: [0.2, 0.8, 0.2, 1] }}
             style={{ height: '100%', background: over ? 'var(--warn)' : 'var(--accent)', borderRadius: 3 }} />
         </div>
-        {over && <div style={{ marginTop: 6, fontSize: 12, color: 'var(--warn)' }}>Over budget by {inr(cost - budget)}</div>}
+        {over
+          ? <div style={{ marginTop: 6, fontSize: 12, color: 'var(--warn)' }}>Over budget by {inr(cost - budget)}</div>
+          : <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--muted)' }}>
+              <span>{budget ? Math.round((cost / budget) * 100) : 0}% used</span>
+              <span style={{ color: 'var(--ink)' }}>{inr(budget - cost)} left</span>
+            </div>}
       </div>
 
       <SmallTable title="YOUR PLAN" rows={[

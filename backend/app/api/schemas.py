@@ -34,7 +34,7 @@ class SimRequest(BaseModel):
 
 class AgentRequest(BaseModel):
     block_id: str
-    brief: Annotated[str, StringConstraints(strip_whitespace=True, max_length=500)]
+    brief: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
     budget_inr: float = Field(ge=MIN_BUDGET_INR, le=MAX_BUDGET_INR)
     years: int = Field(10, ge=1, le=30)
     unit_cost: UnitCost | None = None

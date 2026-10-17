@@ -10,7 +10,7 @@ export function CircleBtn({ icon: Icon, tooltip, onClick, filled = false, disabl
       onClick={disabled ? undefined : onClick}
       whileTap={!disabled ? { scale: 0.9 } : {}}
       style={{
-        width: 40, height: 40, borderRadius: '50%',
+        width: 40, height: 40, flexShrink: 0, borderRadius: '50%',   // never squeezed into an oval by a crowded bar
         border: `1px solid ${filled ? 'var(--accent)' : 'var(--rule)'}`,
         background: filled ? 'var(--accent)' : 'transparent',
         display: 'flex', alignItems: 'center', justifyContent: 'center',

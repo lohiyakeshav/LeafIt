@@ -37,18 +37,21 @@ const ROWS = [
   ['Cost per °C', (m) => m.cost_per_degree_inr, (v) => (v == null ? '—' : inr(v)), 'min'],
 ];
 
+const PINNED = { position: 'sticky', left: 0, zIndex: 1, background: 'var(--surface)' };   // the row-name column, kept in view while scrolling sideways
+
 /** Side-by-side table; the best value in each row is highlighted. */
 export function CompareTable({ options, current }) {
   const cols = [...options, ...(current?.metrics ? [current] : [])];
   return (
     <div style={{ padding: '0 4px 24px' }}>
       <div style={{ ...LABEL, marginBottom: 10 }}>COMPARE PLANS</div>
-      <div style={{ overflowX: 'auto' }}>
+      {/* phones: swipe through the plans while the row names stay pinned on the left */}
+      <div style={{ overflowX: 'auto', scrollbarWidth: 'thin' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontVariantNumeric: 'tabular-nums' }}>
           <thead>
             <tr>
-              <th scope="col" style={{ textAlign: 'left', padding: '8px 0' }} />
-              {cols.map((c) => <th key={c.label} scope="col" style={{ textAlign: 'right', padding: '8px 0 8px 16px', fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap' }}>{c.label}<div style={{ ...LABEL, fontSize: 10.5 }}>YEAR {c.years}</div></th>)}
+              <th scope="col" style={{ ...PINNED, textAlign: 'left', padding: '8px 0' }} />
+              {cols.map((c) => <th key={c.id ?? c.label} scope="col" style={{ textAlign: 'right', verticalAlign: 'bottom', padding: '8px 0 8px 16px', fontSize: 14, fontWeight: 600, minWidth: 104, maxWidth: 170 }}>{c.label}<div style={{ ...LABEL, fontSize: 10.5 }}>YEAR {c.years}</div></th>)}
             </tr>
           </thead>
           <tbody>
@@ -58,7 +61,7 @@ export function CompareTable({ options, current }) {
               const best = nums.length > 1 ? (better === 'max' ? Math.max(...nums) : Math.min(...nums)) : null;
               return (
                 <tr key={name} style={{ borderTop: '1px solid var(--rule)' }}>
-                  <th scope="row" style={{ textAlign: 'left', padding: '11px 0', fontSize: 13.5, fontWeight: 400, color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>{name}</th>
+                  <th scope="row" style={{ ...PINNED, textAlign: 'left', padding: '11px 12px 11px 0', fontSize: 13.5, fontWeight: 400, color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>{name}</th>
                   {vals.map((v, i) => {
                     const win = best != null && v != null && fmt(v) === fmt(best);   // ties as displayed, not to the 5th decimal
                     return <td key={i} style={{ textAlign: 'right', padding: '11px 0 11px 16px', fontFamily: 'var(--font-mono)', fontSize: 13, color: win ? 'var(--accent)' : 'var(--ink)', fontWeight: win ? 600 : 400 }}>{fmt(v)}{win && <span className="sr-only"> (best)</span>}</td>;

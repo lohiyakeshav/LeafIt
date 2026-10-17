@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
-import { ArrowLeft, RotateCcw, Undo2, ArrowRight, Sparkles, Brush } from 'lucide-react';
+import { ArrowLeft, RotateCcw, Undo2, ArrowRight, Sparkles, Brush, Info } from 'lucide-react';
 import { inr } from '../../shared/lib/format.js';
 import { decodePlan } from '../../shared/lib/share.js';
 import HeatGrid from '../../shared/heatmap/HeatGrid.jsx';
@@ -18,7 +18,9 @@ import { SPECIES_BY_ID, crownM2, humidViolationAt, speciesOf, whyNot } from '../
 import { ZONE_LABELS } from '../../model/zones.js';
 import { AUTO, autoSpecies } from '../../model/species.js';
 import { useSimulation } from '../../model/useSimulation.js';
+import { planCost } from '../../model/sim.js';
 import AiSheet from './AiSheet.jsx';
+import { PlanBreakdown } from './components/PlanBreakdown.jsx';
 import { TOOLS, VIEW_OPTS, LAYER_OPTS, ITEM_CAP, PAINT_SPACING_M, DEFAULT_BUDGET } from './config.js';
 import { ToolCard, ExtraBtn } from './components/ToolCard.jsx';
 import { HeatLegend, TurnControl } from './components/StageOverlays.jsx';
@@ -33,8 +35,12 @@ import {
   withoutCell, withoutId, withoutNearest,
 } from '../../model/placements.js';
 
+const ITEM_NAMES = { tree: 'tree', cool_roof: 'cool roof', shade_stop: 'shaded bus stop' };
+
 // zustand actions are stable references, so they can live outside the component and out of every dependency list
-const { openBlock, setItems, undo, clear, setTool, setSpecies, setShowAfter, setYears, setBudget, setUnitCost, beginStroke, strokeSet, saveOption, loadOption, removeOption } = useSession.getState();
+const { openBlock, setItems, undo, clear, setTool, setSpecies, setShowAfter, setYears, setBudget, setUnitCost, beginStroke, strokeSet, saveOption, addAiOptions, loadOption, removeOption } = useSession.getState();
+// Same plan (item ids in order): survives a reload, unlike comparing the arrays themselves
+const sameItems = (a, b) => a.length === b.length && a.every((it, i) => it.id === b[i].id);
 
 export default function StudioPage() {
   const { id } = useParams();
@@ -46,7 +52,7 @@ export default function StudioPage() {
   const items = useSession((s) => s.items);
   const tool = useSession((s) => s.tool);
   const species = useSession((s) => s.species);
-  const [aiNote, setAiNote] = useState(null);     // { answer, items }: the AI planner's explanation, shown only while that exact plan is on the map
+  const [noteFor, setNoteFor] = useState(null);   // id of the AI option whose 'About this plan' card is open (closed: a button brings it back)
   const [liveFor, setLiveFor] = useState({ id: null, c: null });   // today's weather and AQI (the stored ones are from when the area was built)
   const liveNow = liveFor.id === id ? liveFor.c : null;
   const showAfter = useSession((s) => s.showAfter);
@@ -95,6 +101,7 @@ export default function StudioPage() {
   const [wide, setWide] = useState(window.innerWidth >= 1000);
   const view = useRef(null);
   const lastPaint = useRef(null);
+  const paintBroke = useRef(false);
 
   useEffect(() => {
     const on = () => setWide(window.innerWidth >= 1000);
@@ -147,6 +154,15 @@ export default function StudioPage() {
     return current.some((i) => i.type === 'cool_roof' && i.buildingId === t.building.id) ? { valid: false, reason: 'Roof already coated' } : { valid: true };
   }, [grid, tool, species, years]);
 
+  // Budget guard: refuse an item the money left can't pay for (priced exactly as the simulator prices it).
+  const overBudget = useCallback((current, item) => {
+    const before = planCost(grid, toCellPlacements(current), userPrices);
+    const extra = planCost(grid, toCellPlacements([...current, item]), userPrices) - before;
+    if (extra <= 0 || before + extra <= budget + 0.5) return null;
+    const left = Math.max(0, budget - before);
+    return `Not enough budget: ${inr(left)} left, this ${ITEM_NAMES[item.type]} costs ${inr(extra)}. Raise the budget under Costs & budget.`;
+  }, [grid, userPrices, budget]);
+
   const erase = useCallback((t) => {
     const current = useSession.getState().items;
     let next;
@@ -170,11 +186,13 @@ export default function StudioPage() {
     const m = grid.cellM;
     const planted = verdict.species;
     const item = tool === 'tree' ? treeItem(t.x, t.z, m, planted) : tool === 'shade_stop' ? stopItem(t.x, t.z, m) : roofItem(t.building.cells, t.building.id);
+    const broke = overBudget(current, item);
+    if (broke) { toast(broke); return; }
     setItems([...current, item]);
     view.current?.ripple(t.x, t.z);
-  }, [tool, check, grid, erase, toast]);
+  }, [tool, check, grid, erase, toast, overBudget]);
 
-  const paintStart = useCallback(() => { if (tool === 'tree') { lastPaint.current = null; beginStroke(); } }, [tool]);
+  const paintStart = useCallback(() => { if (tool === 'tree') { lastPaint.current = null; paintBroke.current = false; beginStroke(); } }, [tool]);
   const paintMove = useCallback((t) => {
     if (tool !== 'tree') return;
     const last = lastPaint.current;
@@ -182,9 +200,12 @@ export default function StudioPage() {
     const current = useSession.getState().items;
     const verdict = check(t, current);
     if (!verdict.valid) return;
+    const item = treeItem(t.x, t.z, grid.cellM, verdict.species);
+    const broke = overBudget(current, item);
+    if (broke) { if (!paintBroke.current) toast(broke); paintBroke.current = true; return; }   // one message per stroke
     lastPaint.current = t;
-    strokeSet([...current, treeItem(t.x, t.z, grid.cellM, verdict.species)]);
-  }, [tool, check, grid]);
+    strokeSet([...current, item]);
+  }, [tool, check, grid, overBudget, toast]);
 
   // 2D fallback: the flat grid reports cells, we turn them into the same placement calls
   const tapCell = (row, col) => {
@@ -197,6 +218,8 @@ export default function StudioPage() {
 
   // ── derived numbers ───────────────────────────────────────────────────────────
   const totalCost = Number(sim.metrics?.total_cost_inr ?? 0);
+  const aiOpt = items.length ? options.find((o) => o.ai && sameItems(o.items, items)) ?? null : null;
+  const noteOpen = aiOpt != null && noteFor === aiOpt.id;
   const heatOpacity = layer === 'heat' ? 0.6 : 0;
 
   if (!ready || !grid) {
@@ -254,8 +277,29 @@ export default function StudioPage() {
     </>
   );
 
+  // About the AI plan on the map: the stage's free top-right corner (legend top-left, credit bottom-left, turn controls bottom-right)
+  const aboutPlan = aiOpt && (noteOpen ? (
+    <div role="dialog" aria-label="About this plan" style={{ position: 'absolute', right: 12, top: 12, width: 'min(360px, calc(100% - 24px))', maxHeight: 'calc(100% - 72px)', overflowY: 'auto', zIndex: 20, background: 'var(--surface)', border: '1px solid var(--rule)', borderRadius: 16, padding: '12px 14px', boxShadow: '0 8px 30px rgba(0,0,0,0.18)' }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+        <span style={{ ...LABEL, flex: 1 }}>ABOUT THIS PLAN · {aiOpt.label}</span>
+        <button onClick={() => setNoteFor(null)} aria-label="Close" style={{ cursor: 'pointer', color: 'var(--muted)', fontSize: 16, lineHeight: 1 }}>×</button>
+      </div>
+      {aiOpt.ai.answer?.headline && <div style={{ fontSize: 13.5, fontWeight: 600, marginTop: 6 }}>{aiOpt.ai.answer.headline}</div>}
+      {(aiOpt.ai.answer?.zone_actions ?? []).map((z, i) => (
+        <div key={i} style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginTop: 4 }}><b>{z.zone}</b>: {z.action}{z.why ? ` (${z.why})` : ''} <button onClick={() => view.current?.highlightZone(z.zone)} aria-label={`Show the ${ZONE_LABELS[z.zone] ?? z.zone} on the map`} style={{ cursor: 'pointer', color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>Show</button></div>
+      ))}
+      <div style={{ marginTop: 10 }}><PlanBreakdown summary={aiOpt.ai.summary} onShowZone={(z) => view.current?.highlightZone(z)} /></div>
+    </div>
+  ) : (
+    <button onClick={() => setNoteFor(aiOpt.id)} aria-label="About this plan"
+      style={{ position: 'absolute', right: 12, top: 12, zIndex: 20, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 13px', borderRadius: 999, background: 'var(--glass)', backdropFilter: 'blur(8px)', border: '1px solid var(--accent)', color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 11, cursor: 'pointer' }}>
+      <Info size={14} /> ABOUT THIS PLAN
+    </button>
+  ));
+
   const stage = flat ? (
-    <div style={{ height: '100%', containerType: 'size' }}>
+    <div style={{ position: 'relative', height: '100%', containerType: 'size' }}>
+      {aboutPlan}
       <HeatGrid block={block} placements={cellPlacements} cooling={sim.cooling} showAfter={showAfter} onTap={tapCell} onLongPress={longCell}
         isValid={tool === 'erase' ? null : tool === 'cool_roof' ? (r, c) => !whyNot(grid, tool, r, c)
           : (r, c) => check({ x: (c + 0.5) * grid.cellM, z: (r + 0.5) * grid.cellM }, items).valid} />
@@ -270,6 +314,7 @@ export default function StudioPage() {
         onAzimuth={setAzimuth} onSatellite={setSat} onFallback={() => setFlat(true)}
       />
       {layer === 'heat' && heatRange && <HeatLegend lo={heatRange[0]} hi={heatRange[1]} />}
+      {aboutPlan}
       <TurnControl azimuth={azimuth} onTurn={(a) => view.current?.setAzimuth(a)} onReset={() => view.current?.resetView()} />
       <div style={{ position: 'absolute', left: 12, bottom: 10, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', pointerEvents: 'none', maxWidth: '60%' }}>
         {sat?.ok ? sat.copyright : sat?.error === 'no-key' ? 'Add VITE_GOOGLE_MAPS_API_KEY to show the real satellite photo' : sat?.ok === false ? 'Satellite photo unavailable, showing a painted map' : ''}
@@ -286,11 +331,11 @@ export default function StudioPage() {
   const optionsPanel = (
     <PlanOptions options={options} canSave={items.length > 0 && Boolean(sim.metrics) && !options.some((o) => o.items === items)}
       onSave={() => { saveOption(sim.metrics); toast('Saved: keep editing, then compare'); }}
-      onLoad={(o) => { loadOption(o.id); toast(`${o.label} loaded`); }} onRemove={(o) => removeOption(o.id)} onCompare={() => setShowCompare(true)} />
+      onLoad={(o) => { loadOption(o.id); if (o.ai) setNoteFor(o.id); toast(`${o.label} loaded`); }} onRemove={(o) => removeOption(o.id)} onCompare={() => setShowCompare(true)} />
   );
 
   const impact = (
-    <ImpactPanel metrics={sim.metrics} breakdown={sim.breakdown} budget={budget} years={years} compact={!wide} onInfo={setWhyKey} />
+    <ImpactPanel metrics={sim.metrics} breakdown={sim.breakdown} budget={budget} years={years} error={sim.error} compact={!wide} onInfo={setWhyKey} />
   );
 
   const aqiText = live?.aqi != null ? ` · AQI ${live.aqi}` : ' · no AQI reading';
@@ -299,7 +344,6 @@ export default function StudioPage() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12.5, lineHeight: 1.5, color: 'var(--muted)' }}>
       {liveLine && <p>{liveLine}</p>}
       {block.lst_period && <p>Surface heat: hot-season satellite baseline ({block.lst_period}).</p>}
-      {sim.error && <p style={{ color: 'var(--warn)' }}>{sim.error}</p>}
     </div>
   );
 
@@ -311,7 +355,8 @@ export default function StudioPage() {
   );
 
   return (
-    <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    // Capped and centred: on an ultrawide screen the tools, the 3D view and the numbers stay together instead of 3,000 px apart
+    <div style={{ height: '100dvh', width: '100%', maxWidth: 2200, margin: '0 auto', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {header}
       {wide ? (
         <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) clamp(380px, 32vw, 460px)' }}>
@@ -356,7 +401,7 @@ export default function StudioPage() {
           <div style={{ borderTop: '1px solid var(--rule)', background: 'var(--page)', padding: '10px 12px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr) auto', gap: 6 }}>
             <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', gap: 12, padding: '0 4px 2px', fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--muted)' }}>
               <span>COOLING <span style={{ color: 'var(--accent)' }}>{(() => { const c = Number(sim.metrics?.temp_reduction_c ?? 0); return `${c >= 0.005 ? '−' : ''}${c.toFixed(2)}°`; })()}</span></span>
-              <span style={{ color: totalCost > budget ? 'var(--warn)' : 'var(--muted)' }}>{inr(totalCost)} of {inr(budget)}</span>
+              <span style={{ color: totalCost > budget ? 'var(--warn)' : 'var(--muted)' }}>{inr(totalCost)} of {inr(budget)} · {totalCost > budget ? `${inr(totalCost - budget)} over` : `${inr(budget - totalCost)} left`}</span>
             </div>
             {toolCards}
             <button onClick={() => setShowAi(true)} title="Ask AI to plan"
@@ -370,27 +415,26 @@ export default function StudioPage() {
       <AnimatePresence>
         {whyKey && <MetricWhyModal metricKey={whyKey} metrics={sim.metrics} breakdown={sim.breakdown} onClose={() => setWhyKey(null)} />}
       </AnimatePresence>
-      {aiNote?.items === items && aiNote.answer?.headline && (
-        <div style={{ position: 'fixed', left: wide ? 290 : 16, bottom: 16, maxWidth: wide ? 330 : 360, zIndex: 20, background: 'var(--surface)', border: '1px solid var(--rule)', borderRadius: 16, padding: '12px 14px', boxShadow: '0 8px 30px rgba(0,0,0,0.18)' }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
-            <span style={{ ...LABEL, flex: 1 }}>ABOUT THIS PLAN</span>
-            <button onClick={() => setAiNote(null)} aria-label="Dismiss" style={{ cursor: 'pointer', color: 'var(--muted)', fontSize: 16, lineHeight: 1 }}>×</button>
-          </div>
-          <div style={{ fontSize: 13.5, fontWeight: 600, marginTop: 6 }}>{aiNote.answer.headline}</div>
-          {(aiNote.answer.zone_actions ?? []).slice(0, 4).map((z, i) => (
-            <div key={i} style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginTop: 4 }}><b>{z.zone}</b>: {z.action} <button onClick={() => view.current?.highlightZone(z.zone)} aria-label={`Show the ${ZONE_LABELS[z.zone] ?? z.zone} on the map`} style={{ cursor: 'pointer', color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>Show</button></div>
-          ))}
-        </div>
-      )}
       <AnimatePresence>
         {showAi && (
           <AiSheet
             block={block} years={years} budget={budget} unitCost={userPrices} onBudget={setBudget}
-            onApply={(pls, label, answer) => {
+            onApply={(result, selectedId) => {
               // keep the user's own plan so it can be compared with the AI's
-              if (items.length && !options.some((o) => o.items === items)) saveOption(sim.metrics, 'Your plan');
-              const applied = fromCellPlacements(pls, grid.cellM);
-              setItems(applied); setAiNote(answer ? { answer, items: applied } : null); setShowAi(false); toast('AI plan applied · your plan saved to compare');
+              if (items.length && !options.some((o) => sameItems(o.items, items))) saveOption(sim.metrics, 'Your plan');
+              // every option Gemini tested becomes a plan option (its pick first), so all of them can be browsed and compared
+              const run = Date.now().toString(36);
+              const scs = [...result.scenarios].sort((a, b) => (b.id === result.chosen) - (a.id === result.chosen));
+              const opts = scs.map((sc) => ({
+                id: `${run}-${sc.id}`, label: `AI ${sc.id}: ${sc.label}${sc.id === result.chosen ? ' ★' : ''}`, years,
+                items: fromCellPlacements(sc.placements, grid.cellM), metrics: sc.metrics,
+                ai: { pick: sc.id === result.chosen, answer: sc.id === result.chosen ? result.answer : null, summary: sc.summary },
+              }));
+              addAiOptions(opts);
+              const picked = opts.find((o) => o.id === `${run}-${selectedId}`) ?? opts[0];
+              const spent = planCost(grid, toCellPlacements(picked.items), userPrices);
+              setItems(picked.items); setNoteFor(picked.id); setShowAi(false);
+              toast(`${picked.label} applied · ${inr(spent)} of ${inr(budget)} used, ${inr(Math.max(0, budget - spent))} left · all ${opts.length} AI options are in Plan options`);
             }}
             onClose={() => setShowAi(false)}
           />

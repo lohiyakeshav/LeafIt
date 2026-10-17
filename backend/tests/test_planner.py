@@ -1,4 +1,4 @@
-"""The budget optimiser and the planner agent (rules fallback and the Gemini tool loop with a scripted fake)."""
+"""The budget optimiser and the planner agent (the Gemini tool loop with a scripted fake)."""
 import json
 
 import numpy as np
@@ -26,20 +26,14 @@ def test_cheaper_prices_buy_more(block):
     assert len(optimise(block, 300_000, unit_cost={"tree": 1500, **no_roofs})) > len(optimise(block, 300_000, unit_cost=no_roofs))
 
 
-def test_agent_offline_rules_pick_the_landmark_scenario(api, block):
-    school = next(lm["name"] for lm in block.meta["landmarks"] if lm["kind"] == "school")
-    rec = api.post("/agent", json={"block_id": "lajpat_nagar", "budget_inr": 1_500_000,
-                                   "brief": "Keep children walking to the school cool, avoid roofs"}).json()
-    assert rec["source"] == "rules" and rec["explanation"].startswith("- ")
-    assert rec["chosen"] == rec["scenarios"][-1]["id"] and school in rec["scenarios"][-1]["label"]
-    assert all(p["type"] == "tree" for p in rec["placements"]) and rec["metrics"]["total_cost_inr"] <= 1_500_000
-    assert len(rec["steps"]) == 10                           # read the place, 4 scenarios, 4 checks, the choice
-    near = lambda sc: sc["metrics"]["landmark_cooling_c"][school]  # noqa: E731
-    assert near(rec["scenarios"][-1]) > near(rec["scenarios"][0])
-    assert f"Around the {school}" in rec["explanation"]
+def test_agent_needs_a_brief_and_gemini(api):
+    req = {"block_id": "lajpat_nagar", "budget_inr": 1_500_000}
+    assert api.post("/agent", json={**req, "brief": "   "}).status_code == 422          # nothing to plan for
+    r = api.post("/agent", json={**req, "brief": "Keep children walking to the school cool"})   # tests run without Gemini
+    assert r.status_code == 503 and "AI planner" in r.json()["detail"]
+    pricey = api.post("/agent", json={**req, "brief": "cool it", "budget_inr": 20_000, "unit_cost": {"tree": 25_000}})
+    assert pricey.status_code == 422 and "single tree" in pricey.json()["detail"]   # the budget can't buy even one tree
 
-
-# ---- Gemini tool loop, driven by a scripted fake built from real SDK types ------------------------------------------
 def reply(*parts):
     return gt.GenerateContentResponse(candidates=[gt.Candidate(content=gt.Content(role="model", parts=list(parts)))])
 
@@ -86,10 +80,17 @@ def test_gemini_loop_caps_budget_checks_the_plan_and_flags_invented_numbers(bloc
     assert out["unverified_numbers"] == [987654.0]             # invented figure caught, real one accepted
     assert any(s["action"].startswith("Chose S2") for s in out["steps"]) and out["checks"]["trees"] > 0
     assert out["answer"]["zone_actions"][0]["zone"] == "E" and out["explanation"].startswith("- ")
+    # every option comes back browsable: its own placements and a per-zone breakdown that adds up to them
+    for sc in out["scenarios"]:
+        sm, pl = sc["summary"], sc["placements"]
+        assert sm["trees"] == sum(p.get("count", 1) for p in pl if p["type"] == "tree") == sum(sm["species"].values())
+        assert sum(z["trees"] + z["cool_roofs"] + z["shade_stops"] for z in sm["zones"]) == sm["trees"] + sm["cool_roofs"] + sm["shade_stops"]
+    assert next(sc for sc in out["scenarios"] if sc["id"] == "S2")["placements"] == out["placements"]
 
 
-def test_broken_model_falls_back_to_rules(block):
-    assert agent.plan(block, "hot streets", 500_000, llm=FakeLLM([])).get("source") == "rules"
+def test_broken_model_is_an_error_not_a_made_up_plan(block):
+    with pytest.raises(agent.PlannerUnavailable):
+        agent.plan(block, "hot streets", 500_000, llm=FakeLLM([]))
 
 
 def test_auto_species_is_a_mix_not_a_monoculture(block):

@@ -36,7 +36,7 @@ export function Dialog({ children, onClose, width = 640 }) {
           position: 'relative', background: 'var(--surface)', borderRadius: wide ? 24 : '28px 28px 0 0',
           border: '1px solid var(--rule)', boxShadow: wide ? 'var(--shadow)' : undefined,
           width: '100%', maxWidth: wide ? width : 640, maxHeight: wide ? '86vh' : '90vh',
-          overflowY: 'auto', paddingTop: wide ? 20 : 8, outline: 'none',
+          overflowY: 'auto', overflowX: 'hidden', paddingTop: wide ? 20 : 8, outline: 'none',   // wide content scrolls inside itself, never the whole sheet
         }}
       >
         <button onClick={onClose} aria-label="Close" title="Close (Esc)"

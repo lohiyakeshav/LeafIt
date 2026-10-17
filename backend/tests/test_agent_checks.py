@@ -3,11 +3,12 @@ and the model (a scripted fake here) has to revise. Plus the place brief it read
 import json
 
 import numpy as np
+import pytest
 
 from app.agents import agent, checks, context
 from app.domain import plantable, zones
 from app.domain import species as species_mod
-from app.domain.sim import Block, simulate
+from app.domain.sim import Block
 from tests.test_planner import FakeLLM, answer, call, reply
 from tests.test_shade_and_rules import COLS, ROWS, blk
 
@@ -143,13 +144,6 @@ def test_the_final_answer_is_structured_and_every_number_in_it_is_checked(block)
     assert 8421.0 in out["unverified_numbers"] and 31337.0 in out["unverified_numbers"]       # numbers inside zone actions and caveats are caught too
 
 
-def test_rules_fallback_avoids_wasted_trees_and_gives_a_structured_answer():
-    out = agent.plan(shaded_block(), "cool the streets", 800_000)
-    assert out["source"] == "rules" and out["checks"]["low_value_tree_ratio"] <= checks.LOW_VALUE_LIMIT
-    assert out["answer"]["headline"] and out["answer"]["zone_actions"] and out["answer"]["caveats"]
-    assert out["metrics"]["total_cost_inr"] <= 800_000 and simulate(shaded_block(), out["placements"])["metrics"]["temp_reduction_c"] > 0
-
-
 class Spy(FakeLLM):
     """A FakeLLM that keeps the very first message the planner sends."""
     first = None
@@ -168,9 +162,9 @@ def test_the_agent_sends_two_labelled_maps_with_the_brief(block):
     assert all(i.mime_type == "image/png" and i.data[:8] == b"\x89PNG\r\n\x1a\n" for i in images)
 
 
-def test_gemini_failing_midway_falls_back_to_rules(block):
-    out = agent.plan(block, "hot streets", 500_000, llm=FakeLLM([reply(call("get_place_brief"))]))   # the script runs out: a broken model
-    assert out["source"] == "rules" and out["answer"]["bullets"]
+def test_gemini_failing_midway_is_an_error_not_a_made_up_plan(block):
+    with pytest.raises(agent.PlannerUnavailable):   # the script runs out: a broken model
+        agent.plan(block, "hot streets", 500_000, llm=FakeLLM([reply(call("get_place_brief"))]))
 
 
 

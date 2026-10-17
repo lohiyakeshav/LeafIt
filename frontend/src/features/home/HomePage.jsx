@@ -13,6 +13,9 @@ const STEPS = [
   { icon: Trees,        title: 'Test the fixes',   body: 'Plant trees, coat roofs, shade bus stops on a 3D twin and watch the numbers move.' },
 ];
 
+// Header, hero and footer share one centred column, so on a wide or ultrawide screen their edges line up
+const COLUMN = { width: '100%', maxWidth: 1240, margin: '0 auto' };
+
 export default function HomePage() {
   const [time, setTime] = useState(delhiTime());
   const navigate = useNavigate();
@@ -24,6 +27,7 @@ export default function HomePage() {
   }, []);
 
   const wide = useWide(1000);
+  const roomy = useWide(520);   // a phone's header keeps only the name and the two controls
   const steps = (
     <ol style={{ listStyle: 'none' }}>
       {STEPS.map(({ icon: Icon, title, body }, i) => (
@@ -44,16 +48,16 @@ export default function HomePage() {
   return (
     // Desktop: exactly one screen (hero left, how-it-works right). Phones: one scrolling column.
     <div style={{ height: wide ? '100dvh' : undefined, minHeight: '100dvh', display: 'flex', flexDirection: 'column', overflow: wide ? 'hidden' : undefined }}>
-      <header style={{ padding: wide ? '16px 40px' : '14px var(--gutter)', display: 'flex', alignItems: 'center', gap: 10 }}>
+      <header style={{ ...COLUMN, padding: wide ? '16px 40px' : '14px var(--gutter)', display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{ fontSize: 15, fontWeight: 650, letterSpacing: '-0.02em' }}>LeafIt</span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>v0.1 — 2026</span>
+        {roomy && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>v0.1 — 2026</span>}
         <div style={{ flex: 1 }} />
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>New Delhi · {time}</span>
+        {roomy && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>New Delhi · {time}</span>}
         <CurrencyPicker />
         <ThemeToggle />
       </header>
 
-      <main style={{ flex: 1, minHeight: 0, width: '100%', maxWidth: 1240, margin: '0 auto', padding: wide ? '0 40px' : '0 var(--gutter)',
+      <main style={{ ...COLUMN, flex: 1, minHeight: 0, padding: wide ? '0 40px' : '0 var(--gutter)',
         display: 'grid', gridTemplateColumns: wide ? 'minmax(0, 1.15fr) minmax(340px, 0.85fr)' : '1fr', gap: wide ? 'clamp(40px, 6vw, 96px)' : 0, alignItems: 'center' }}>
         <div style={{ paddingTop: wide ? 0 : 28 }}>
           <Reveal delay={0.35}><Kicker>Heat-action planner — New Delhi</Kicker></Reveal>
@@ -92,7 +96,7 @@ export default function HomePage() {
 
       <footer style={{ marginTop: wide ? 0 : 56, borderTop: '1px solid var(--rule)' }}>
         <div style={{ paddingTop: 8 }}><Marquee words={['trees', 'cool roofs', 'shaded stops', 'less heat', 'more shade', 'cleaner air']} size={wide ? 30 : 44} /></div>
-        <div style={{ padding: wide ? '6px 40px 14px' : '14px var(--gutter) 24px', display: 'flex', justifyContent: 'space-between' }}>
+        <div style={{ ...COLUMN, padding: wide ? '6px 40px 14px' : '14px var(--gutter) 24px', display: 'flex', justifyContent: 'space-between' }}>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>Estimates, not promises</span>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>28.57° N 77.24° E</span>
         </div>

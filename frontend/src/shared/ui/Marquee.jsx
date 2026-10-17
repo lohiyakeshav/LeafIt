@@ -1,10 +1,26 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
+/** Words scrolling sideways forever. Repeats the list as often as the screen needs, so even an ultrawide one is never half empty. */
 export function Marquee({ words = [], size = 44, seconds = 38 }) {
+  const box = useRef();
   const ref = useRef();
   const xRef = useRef(0);
   const rafRef = useRef();
+  const [reps, setReps] = useState(2);   // copies of the word list: the box's width plus one spare copy to scroll into
+  const repsRef = useRef(reps);   // what the animation loop and the measuring read (they live outside render)
+  useLayoutEffect(() => { repsRef.current = reps; }, [reps]);   // before the browser measures the new copies
 
+  useEffect(() => {
+    const fit = () => {
+      const one = ref.current.scrollWidth / repsRef.current;
+      if (one > 0) setReps(Math.max(2, Math.ceil(box.current.clientWidth / one) + 1));
+    };
+    fit();
+    const ro = new ResizeObserver(fit);   // window resizes, and the web font arriving (it changes the word widths)
+    ro.observe(box.current);
+    ro.observe(ref.current);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     let last = performance.now();
@@ -12,8 +28,9 @@ export function Marquee({ words = [], size = 44, seconds = 38 }) {
       const dt = now - last; last = now;
       const el = ref.current;
       if (!el) return;
-      xRef.current -= (dt / 1000) * (el.scrollWidth / 2 / seconds);
-      if (xRef.current <= -el.scrollWidth / 2) xRef.current = 0;
+      const one = el.scrollWidth / repsRef.current;   // scroll exactly one copy, then wrap: the seam never shows
+      xRef.current -= (dt / 1000) * (one / seconds);
+      if (xRef.current <= -one) xRef.current += one;
       el.style.transform = `translateX(${xRef.current}px)`;
       rafRef.current = requestAnimationFrame(tick);
     }
@@ -22,12 +39,12 @@ export function Marquee({ words = [], size = 44, seconds = 38 }) {
   }, [seconds]);
 
   return (
-    <div style={{ overflow: 'hidden', userSelect: 'none', height: size * 1.2 }}>
+    <div ref={box} style={{ overflow: 'hidden', userSelect: 'none', height: size * 1.2 }}>
       <div
         ref={ref}
         style={{ display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap', willChange: 'transform' }}
       >
-        {[0, 1].map(rep =>
+        {Array.from({ length: reps }, (_, rep) =>
           words.map((w, i) => (
             <span
               key={`${rep}-${i}`}

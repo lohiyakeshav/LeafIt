@@ -3,6 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, CheckCircle, AlertCircle, ChevronDown } from 'lucide-react';
 import { endpoints } from '../../api/endpoints.js';
 import { inr, displayCurrency, toDisplay, fromDisplay } from '../../shared/lib/format.js';
+import { prices } from '../../model/sim.js';
+import { budgetProblem } from './budget.js';
+import { PlanBreakdown } from './components/PlanBreakdown.jsx';
 import { Reveal, Kicker, SectionHead, Pill, Spinner, Bullets, Dialog } from '../../shared/ui';
 
 const EXAMPLES = [
@@ -24,24 +27,33 @@ export default function AiSheet({ block, years, budget, unitCost, onBudget, onAp
   const [brief, setBrief]     = useState('');
   // INR is typed in lakh (as Indian budgets are quoted); other currencies as a plain amount, converted to INR here
   const { code } = displayCurrency(), lakhs = code === 'INR';
-  const [budgetL, setBudgetL] = useState(lakhs ? (budget / 1e5).toFixed(0) : String(Math.round(toDisplay(budget))));
+  const [budgetL, setBudgetL] = useState(lakhs ? String(+(budget / 1e5).toFixed(2)) : String(Math.round(toDisplay(budget))));   // exact: 2.5 lakh stays 2.5
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(null);
   const [result, setResult]   = useState(null);
 
   const budgetVal = lakhs ? parseFloat(budgetL) * 1e5 : fromDisplay(parseFloat(budgetL));
-  const budgetOk  = !isNaN(budgetVal) && budgetVal >= 10_000 && budgetVal <= 1_000_000_000;
+  const treePrice = prices(unitCost).tree;
+  const budgetError = budgetProblem(budgetVal, treePrice);
+  const budgetOk  = budgetError === null;
+
+  // One budget for the whole Studio: a valid amount typed here is the budget on the main screen too, straight away
+  function editBudget(text) {
+    setBudgetL(text);
+    const v = lakhs ? parseFloat(text) * 1e5 : fromDisplay(parseFloat(text));
+    if (budgetProblem(v, treePrice) === null) onBudget?.(Math.round(v));
+  }
+  const briefOk   = brief.trim().length > 0;   // Gemini plans for what the user asked, never a default
 
   async function run() {
-    if (!budgetOk) return;
-    onBudget?.(Math.round(budgetVal));
+    if (!budgetOk || !briefOk) return;
     setLoading(true);
     setError(null);
     setResult(null);
     try {
       const res = await endpoints.agentPlan({
         block_id: block.id,
-        brief: brief.trim() || EXAMPLES[EXAMPLES.length - 1],
+        brief: brief.trim(),
         budget_inr: Math.round(budgetVal),
         years,
         unit_cost: unitCost ?? undefined,   // the planner spends the budget at the user's prices
@@ -54,12 +66,8 @@ export default function AiSheet({ block, years, budget, unitCost, onBudget, onAp
     }
   }
 
-  function applyPlan() {
-    if (!result) return;
-    const placements = result.placements.map(p => ({ type: p.type, row: p.row, col: p.col, count: p.count ?? 1, ...(p.species ? { species: p.species } : {}) }));
-    const chosen = result.scenarios?.find(s => s.id === result.chosen);
-    onApply?.(placements, chosen?.label ?? '', result.answer ?? null);
-  }
+  // Every option Gemini tested goes to the compare list; `selectedId` (Gemini's pick unless the user chose another) goes on the map
+  const applyPlan = (selectedId) => result && onApply?.(result, selectedId);
 
   return (
     <Dialog onClose={onClose}>
@@ -120,9 +128,9 @@ export default function AiSheet({ block, years, budget, unitCost, onBudget, onAp
             <input
               type="number"
               value={budgetL}
-              onChange={e => setBudgetL(e.target.value)}
-              min="0.1"
-              step="1"
+              onChange={e => editBudget(e.target.value)}
+              min="0"
+              step="any"
               style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontFamily: 'var(--font-sans)', fontSize: 18, fontWeight: 600, color: 'var(--ink)' }}
             />
             <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--muted)' }}>{lakhs ? 'lakh ₹' : code}</span>
@@ -133,8 +141,8 @@ export default function AiSheet({ block, years, budget, unitCost, onBudget, onAp
             </div>
           )}
           {!budgetOk && (
-            <div style={{ padding: '4px 4px 0', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--warn)' }}>
-              Enter a budget between {inr(10_000)} and {inr(1_000_000_000)}
+            <div role="alert" style={{ padding: '4px 4px 0', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--warn)' }}>
+              {budgetError}
             </div>
           )}
         </div>
@@ -146,7 +154,7 @@ export default function AiSheet({ block, years, budget, unitCost, onBudget, onAp
           icon={Sparkles}
           expand
           loading={loading}
-          disabled={!budgetOk}
+          disabled={!budgetOk || !briefOk || loading}
           onClick={run}
         />
 
@@ -160,6 +168,8 @@ export default function AiSheet({ block, years, budget, unitCost, onBudget, onAp
             </motion.div>
           )}
         </AnimatePresence>
+
+        {!briefOk && !loading && <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>Describe what to protect, or tap an example, to plan.</p>}
 
         {error && <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--warn)', marginTop: 14 }}>{error}</p>}
 
@@ -195,7 +205,7 @@ function ThinkingTicker() {
 }
 
 function AiResult({ result, onApply }) {
-  const gemini    = result.source === 'gemini';
+  const [selected, setSelected] = useState(result.chosen);   // Gemini's pick by default; any option can be browsed
   const unverified = result.unverified_numbers ?? [];
   const scenarios  = result.scenarios ?? [];
   const answer     = result.answer;
@@ -211,13 +221,8 @@ function AiResult({ result, onApply }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Kicker>Recommendation</Kicker>
           <div style={{ flex: 1 }} />
-          <span style={{
-            padding: '5px 10px', borderRadius: 999,
-            border: `1px solid ${gemini ? 'var(--accent)' : 'var(--rule)'}`,
-            fontFamily: 'var(--font-mono)', fontSize: 10.5,
-            color: gemini ? 'var(--accent)' : 'var(--muted)',
-          }}>
-            {gemini ? 'GEMINI' : 'OFFLINE RULES'}
+          <span style={{ padding: '5px 10px', borderRadius: 999, border: '1px solid var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--accent)' }}>
+            GEMINI
           </span>
         </div>
       </Reveal>
@@ -246,8 +251,7 @@ function AiResult({ result, onApply }) {
         </ul>
       )}
 
-      {gemini && (
-        <Reveal delay={0.4}>
+      <Reveal delay={0.4}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 4 }}>
             {unverified.length === 0
               ? <CheckCircle size={15} color="var(--accent)" />
@@ -261,15 +265,15 @@ function AiResult({ result, onApply }) {
             </span>
           </div>
         </Reveal>
-      )}
 
       <div style={{ height: 26 }} />
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>OPTIONS TESTED</div>
       <div style={{ height: 10 }} />
 
+      <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>Tap an option to see what it puts where. All of them are added to Plan options to compare.</div>
       {scenarios.map((sc, i) => (
         <Reveal key={sc.id} delay={0.2 + i * 0.11}>
-          <ScenarioCard sc={sc} chosen={sc.id === result.chosen} />
+          <ScenarioCard sc={sc} pick={sc.id === result.chosen} selected={sc.id === selected} onSelect={() => setSelected(sc.id)} />
         </Reveal>
       ))}
 
@@ -308,30 +312,34 @@ function AiResult({ result, onApply }) {
       </div>
 
       <div style={{ height: 20 }} />
-      <Pill label="Apply to the map" icon={() => <CheckCircle size={18} />} expand onClick={onApply} />
+      <Pill label={selected === result.chosen ? "Apply Gemini's pick to the map" : `Apply ${scenarios.find(s => s.id === selected)?.label ?? selected} to the map`}
+        icon={() => <CheckCircle size={18} />} expand onClick={() => onApply(selected)} />
     </div>
   );
 }
 
-function ScenarioCard({ sc, chosen }) {
+function ScenarioCard({ sc, pick, selected, onSelect }) {
   const m = sc.metrics ?? {};
   return (
     <motion.div
-      animate={{ borderColor: chosen ? 'var(--accent)' : 'var(--rule)', background: chosen ? 'var(--accent-soft)' : 'rgba(0,0,0,0)' }}
+      animate={{ borderColor: selected ? 'var(--accent)' : 'var(--rule)', background: selected ? 'var(--accent-soft)' : 'rgba(0,0,0,0)' }}
       style={{ borderRadius: 18, border: '1px solid var(--rule)', padding: 16, marginBottom: 10, transition: 'all 0.45s' }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: chosen ? 'var(--accent)' : 'var(--muted)' }}>{sc.id}</span>
+      <button onClick={onSelect} aria-expanded={selected} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 14, textAlign: 'left', cursor: 'pointer' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: selected ? 'var(--accent)' : 'var(--muted)' }}>{sc.id}</span>
         <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 15.5, fontWeight: 600, letterSpacing: '-0.02em' }}>{sc.label}</div>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 15.5, fontWeight: 600, letterSpacing: '-0.02em' }}>
+            {sc.label}{pick && <span style={{ marginLeft: 8, fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--accent)' }}>GEMINI'S PICK</span>}
+          </div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
             −{m.temp_reduction_c}° avg · −{m.peak_reduction_c}° peak · {inr(m.total_cost_inr)}
           </div>
         </div>
-        <motion.div animate={{ scale: chosen ? 1 : 0 }} transition={{ type: 'spring', damping: 12 }}>
+        <motion.div animate={{ scale: selected ? 1 : 0 }} transition={{ type: 'spring', damping: 12 }}>
           <CheckCircle size={22} color="var(--accent)" />
         </motion.div>
-      </div>
+      </button>
+      {selected && sc.summary && <div style={{ marginTop: 12 }}><PlanBreakdown summary={sc.summary} /></div>}
     </motion.div>
   );
 }

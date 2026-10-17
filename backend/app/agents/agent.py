@@ -7,7 +7,7 @@ What makes it more than a prompt:
   * it must CHECK its plan (agents/checks.py), and choosing a plan that wastes trees in already-shaded spots is refused in code,
     so the revision loop is real and not a suggestion;
   * every figure comes from the tools, and the final answer is checked for numbers no tool produced.
-Without Gemini, keyword rules run the same tools so the feature still works offline.
+There is no offline stand-in: without Gemini the planner says so (PlannerUnavailable) rather than inventing a plan.
 """
 import json
 import logging
@@ -19,12 +19,11 @@ from app.agents import checks, context, maps
 from app.config import MODEL
 from app.domain import plantable, zones
 from app.domain import species as species_mod
-from app.domain.optimise import PEOPLE_KINDS, optimise
+from app.domain.optimise import optimise
 from app.domain.sim import Block, simulate
 from app.integrations.gemini import PLANNER_MODEL, PLANNER_THINKING, client, generate, unverified_numbers
 
 MAX_TURNS = 16
-HOMES_ROOF_SHARE = 0.25   # the rules planner's mixed option: a quarter of the budget to cool roofs on the most-lived-in homes
 MAX_REVISIONS = 2     # a plan refused for wasting trees may be redone this many times; after that the best checked plan wins
 GOALS = ("average", "hotspots", "people", "vulnerable")
 INDOOR_C_RANGE = MODEL["roof"]["indoor_c_range"]
@@ -261,75 +260,27 @@ def _gemini(s: Session, brief: str, llm) -> dict:
     return json.loads(final.text)
 
 
-def _rules(s: Session, brief: str) -> dict:
-    """Keyword rules driving the same tools, so the feature works without Gemini."""
-    text = brief.lower()
-    lms = s.block.meta.get("landmarks", [])
-    focus = [lm["name"] for lm in lms if lm["kind"] in text or lm["name"].lower() in text]
-    no_roofs = "roof" in text and any(w in text for w in ("avoid", "no ", "without", "not "))
-    people = any(w in text for w in ("hot", "people", "walk", "wait", "children", "elderly", "kids", "school"))
-    homes = not no_roofs and any(w in text for w in ("home", "house", "roof", "indoor", "sleep", "night", "everything", "all options"))
-    kinds = ["tree"] if no_roofs else ["tree", "cool_roof"]
-    has_people_data = s.block.exposure is not None
-    s.get_place_brief()
-    s.run_scenario("Whole-area cooling", "average", kinds, avoid_shaded=True)
-    s.run_scenario("Hottest ground first", "hotspots", kinds, avoid_shaded=True)
-    if has_people_data or any(lm["kind"] in PEOPLE_KINDS for lm in lms):
-        s.run_scenario("People first", "vulnerable" if has_people_data else "people", [*kinds, "shade_stop"], avoid_shaded=True)
-    if not no_roofs:
-        s.run_scenario("Streets, homes and stops", "vulnerable" if has_people_data else "people", ["tree", "cool_roof", "shade_stop"],
-                       avoid_shaded=True, roof_budget_share=HOMES_ROOF_SHARE)
-    if focus:
-        s.run_scenario(f"Focus on {', '.join(focus)}", "hotspots", kinds, focus_landmarks=focus, avoid_shaded=True)
-    for sc in s.scenarios:
-        s.check_plan(sc["id"])
-    by_goal = {sc["goal"]: sc for sc in s.scenarios if sc["label"] != "Streets, homes and stops"}
-    people_pick = by_goal.get("vulnerable") or by_goal.get("people")
-    mixed = next((sc for sc in s.scenarios if sc["label"] == "Streets, homes and stops"), None)
-    if focus:
-        pick, why = s.scenarios[-1], "it targets the places named in the brief"
-    elif mixed and homes:
-        pick, why = mixed, "the brief is about homes and the people waiting outside, not only the streets"
-    elif people and people_pick:
-        pick, why = people_pick, "the brief is about people's exposure"
-    else:
-        pick, why = max(s.scenarios, key=lambda x: x["metrics"]["temp_reduction_c"]), "it cools the area most"
-    s.choose(pick["id"], f"Keyword rules: {why}")
-    return _rules_answer(s, pick, focus, no_roofs, why)
-
-
-def _rules_answer(s: Session, pick: dict, focus: list[str], no_roofs: bool, why: str) -> dict:
-    m = pick["metrics"]
+def _summary(s: Session, placements: list[dict]) -> dict:
+    """What a plan puts where: totals, the species mix, and per zone (busiest first) its trees by species, roofs, shelters,
+    roads and landmarks. Facts from the placements, so every option can be browsed, not only the one Gemini wrote up."""
     rows, cols = s.block.lst.shape
-    near = lambda x, n: x["metrics"]["landmark_cooling_c"].get(n, 0)
-    bullets = [f"Estimated −{m['temp_reduction_c']} °C on average across streets and open ground, up to −{m['peak_reduction_c']} °C at the most improved spots, "
-               f"for ₹{m['total_cost_inr']:,}.",
-               f"Chosen because {why}.",
-               *[f"Around the {n}: −{near(pick, n)} °C with this plan vs −{near(s.scenarios[0], n)} °C with whole-area cooling." for n in focus]]
-    bullets += [f"{o['label']}: −{o['metrics']['temp_reduction_c']} °C average, {o['metrics']['heat_exposure_pct']}% of outdoor area still exposed "
-                f"(vs {m['heat_exposure_pct']}%)." for o in s.scenarios if o is not pick]
-    if no_roofs:
-        bullets.append("Roofs were left untouched, as the brief asked.")
+    total = {"trees": 0, "cool_roofs": 0, "shade_stops": 0, "species": {}}
     per_zone: dict[str, dict] = {}
-    for p in pick["placements"]:
-        z = per_zone.setdefault(zones.zone_of(p["row"], p["col"], rows, cols), {"trees": 0, "roofs": 0, "stops": 0})
-        z["trees" if p["type"] == "tree" else "roofs" if p["type"] == "cool_roof" else "stops"] += p.get("count", 1)
-    actions = []
-    for name, n in sorted(per_zone.items(), key=lambda kv: -sum(kv[1].values()))[:4]:
-        roads = context.zone_stats(s.block, name, s._capacity)["roads"]
-        bits = [f"{n['trees']} trees" if n["trees"] else "", f"{n['roofs']} cool roofs" if n["roofs"] else "", f"{n['stops']} shaded stops" if n["stops"] else ""]
-        actions.append({"zone": name, "action": "Plant and install " + ", ".join(b for b in bits if b) + (f" along {roads[0]}" if roads else ""),
-                        "why": f"One of the hotter or busier parts of the area ({zones.LABELS[name]})."})
-    pick_checks = s.checked.get(pick["id"])
-    q = s.brief["data_quality"]
-    caveats = ["These are model estimates, not measurements."]
-    if q["canopy_source"] not in ("meta_wri", None):
-        caveats.append(f"Existing tree cover came from a coarser source ({q['canopy_source']}), so shaded spots may be misjudged.")
-    if q["population_source"] is None:
-        caveats.append("No population data: the plan cannot favour where vulnerable people live.")
-    if pick_checks and pick_checks["trees"] >= 20 and pick_checks["dominant_species_share"] > checks.MONOCULTURE_SHARE:
-        caveats.append("Most trees are one species. Mixing species would protect against pests and disease; choose species yourself to do that.")
-    return {"headline": f"{pick['label']}: the best fit for the brief within the budget.", "bullets": bullets, "zone_actions": actions, "caveats": caveats}
+    for p in placements:
+        z = per_zone.setdefault(zones.zone_of(p["row"], p["col"], rows, cols), {"trees": 0, "cool_roofs": 0, "shade_stops": 0, "species": {}})
+        for d in (total, z):
+            if p["type"] == "tree":
+                n, sp = p.get("count", 1), p.get("species") or "generic"
+                d["trees"] += n
+                d["species"][sp] = d["species"].get(sp, 0) + n
+            else:
+                d["cool_roofs" if p["type"] == "cool_roof" else "shade_stops"] += 1
+    busiest = sorted(per_zone.items(), key=lambda kv: -(kv[1]["trees"] + kv[1]["cool_roofs"] + kv[1]["shade_stops"]))
+    out = []
+    for name, z in busiest:
+        st = context.zone_stats(s.block, name, s._capacity)
+        out.append({"zone": name, "label": zones.LABELS[name], **z, "roads": st["roads"][:3], "landmarks": st["landmarks"][:3]})
+    return {**total, "zones": out}
 
 
 def _text(answer: dict) -> str:
@@ -339,22 +290,27 @@ def _text(answer: dict) -> str:
     return "\n".join(parts)
 
 
+class PlannerUnavailable(Exception):
+    """Gemini isn't configured or didn't finish. Message is user-safe."""
+
+
 def plan(block: Block, brief: str, budget: float, years: int = 10, llm=None, unit_cost: dict | None = None) -> dict:
     llm = llm or client()
-    s, source, answer = Session(block, budget, years, unit_cost), "rules", {}
-    if llm:
-        try:
-            answer, source = _gemini(s, brief, llm), "gemini"
-        except Exception:
-            logging.exception("Gemini planner failed, using rules")
-            s, source = Session(block, budget, years, unit_cost), "rules"
-    if source == "rules":
-        answer = _rules(s, brief)
-    chosen = next((x for x in s.scenarios if x["id"] == s.chosen), max(s.scenarios, key=lambda x: x["metrics"]["temp_reduction_c"]))
+    if not llm:
+        raise PlannerUnavailable("The AI planner isn't set up on this server (no Gemini access).")
+    s = Session(block, budget, years, unit_cost)
+    try:
+        answer = _gemini(s, brief, llm)
+    except Exception as e:
+        logging.exception("Gemini planner failed")
+        raise PlannerUnavailable("The AI planner couldn't finish this time. Please try again.") from e
+    chosen = next(x for x in s.scenarios if x["id"] == s.chosen)
     return {
         "placements": chosen["placements"], **simulate(block, chosen["placements"], years, unit_cost), "chosen": chosen["id"],
-        "scenarios": [{k: x[k] for k in ("id", "label", "metrics")} for x in s.scenarios],
-        "steps": s.steps, "answer": answer, "explanation": "\n".join(f"- {b}" for b in answer.get("bullets", [])), "source": source,
+        # every option Gemini tested, with what it puts where, so the user can browse and compare them all
+        "scenarios": [{**{k: x[k] for k in ("id", "label", "goal", "metrics", "placements")}, "summary": _summary(s, x["placements"]),
+                       "checks": s.checked.get(x["id"])} for x in s.scenarios],
+        "steps": s.steps, "answer": answer, "explanation": "\n".join(f"- {b}" for b in answer.get("bullets", [])), "source": "gemini",
         "checks": s.checked.get(chosen["id"]) or checks.check_plan(block, chosen["placements"], years, unit_cost, budget),
-        "unverified_numbers": unverified_numbers(_text(answer), s.outputs, budget, years) if source == "gemini" else [],
+        "unverified_numbers": unverified_numbers(_text(answer), s.outputs, budget, years),
     }
