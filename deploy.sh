@@ -7,7 +7,7 @@ REGION=${REGION:-asia-south1}
 SA=${SA:-earth-engine-api@$PROJECT.iam.gserviceaccount.com}
 IMAGE=$REGION-docker.pkg.dev/$PROJECT/leafit/leafit
 env_of() { grep "^$1=" "$2" | tail -1 | cut -d= -f2-; }
-MAPS_KEY=$(env_of VITE_GOOGLE_MAPS_API_KEY frontend/.env.local)        # browser key: restrict it to the run.app URL
+MAPS_KEY=$(env_of VITE_GOOGLE_MAPS_API_KEY frontend/.env.local)        # browser key: allow https://leafit.cloud.run/* (and the run.app URL)
 SERVER_KEY=$(env_of GOOGLE_MAPS_SERVER_KEY backend/.env)               # Places (landmarks, vendors) + Air Quality
 MODEL=$(env_of LEAFIT_GEMINI_MODEL backend/.env); MODEL=${MODEL:-gemini-2.5-flash}
 PLANNER=$(env_of LEAFIT_PLANNER_MODEL backend/.env); PLANNER=${PLANNER:-$MODEL}

@@ -1,6 +1,6 @@
 # LeafIt
 
-**Redesign your block. Leave it greener.**
+**Redesign your block. Leave it greener.** · Live: **https://leafit.cloud.run**
 An AI-powered climate intervention simulator, built by Friendly Neighbourhood Devs.
 
 Search for a real place, mark out your neighbourhood on the satellite map, and test trees, cool roofs and shaded bus stops on a 2.5D isometric twin of it. Cooling, heat exposure, CO₂, air quality and cost update as you place things. A Gemini planner can propose a plan within your budget (it inspects the place, tests several options on the simulator, checks and revises its own plan), and local vendors turn it into a quote.
@@ -88,7 +88,7 @@ gcloud auth login
 
 One container serves the API and the built web app. No Gemini key or key file ships: Gemini runs on Vertex AI and Earth Engine reads
 satellites as the service's runtime service account (Earth Engine + Service Usage roles; `deploy.sh` adds `roles/aiplatform.user`).
-Add the `run.app` URL to the browser Maps key's allowed referrers. Local Docker: `docker build --build-arg VITE_GOOGLE_MAPS_API_KEY=<browser key> -t leafit .` Built areas are cached on local disk, which Cloud Run loses on restart; re-implement `backend/app/repositories/` on Firestore or GCS when that matters.
+Live at **https://leafit.cloud.run** (custom URL; the service's own `run.app` URL also works). Both must be in the browser Maps key's allowed referrers. Local Docker: `docker build --build-arg VITE_GOOGLE_MAPS_API_KEY=<browser key> -t leafit .` Built areas are cached on local disk, which Cloud Run loses on restart; re-implement `backend/app/repositories/` on Firestore or GCS when that matters.
 
 ## The sample area
 

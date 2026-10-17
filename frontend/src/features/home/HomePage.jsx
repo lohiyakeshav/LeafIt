@@ -97,7 +97,12 @@ export default function HomePage() {
       <footer style={{ marginTop: wide ? 0 : 56, borderTop: '1px solid var(--rule)' }}>
         <div style={{ paddingTop: 8 }}><Marquee words={['trees', 'cool roofs', 'shaded stops', 'less heat', 'more shade', 'cleaner air']} size={wide ? 30 : 44} /></div>
         <div style={{ ...COLUMN, padding: wide ? '6px 40px 14px' : '14px var(--gutter) 24px', display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>Estimates, not promises</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>
+            Built by{' '}
+            <a href="https://keshavlohiya.vercel.app" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
+              Friendly Neighbourhood Devs
+            </a>
+          </span>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>28.57° N 77.24° E</span>
         </div>
       </footer>

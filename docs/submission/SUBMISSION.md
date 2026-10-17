@@ -3,8 +3,8 @@
 | Requirement | Deliverable | Status |
 |---|---|---|
 | Category | **Sustainability** | done |
-| Proposal deck (PDF) | `docs/submission/LeafIt_Deck.pdf` (11 slides, source: `deck.html`) | fill in `{{LIVE_URL}}` / `{{VIDEO_URL}}` on slide 11, then re-export |
-| Prototype on Google Cloud, using Google Cloud AI | `./deploy.sh`: Cloud Build → Artifact Registry → Cloud Run, Gemini on **Vertex AI**, Earth Engine | run after `gcloud auth login` |
+| Proposal deck (PDF) | `docs/submission/LeafIt_Deck.pdf` (11 slides, source: `deck.html`) | live URL in; fill in `{{VIDEO_URL}}` on slide 11, then re-export |
+| Prototype on Google Cloud, using Google Cloud AI | **https://leafit.cloud.run**: Cloud Run (auto-deployed from GitHub `main` by Cloud Build), Gemini on **Vertex AI**, Earth Engine | live |
 | 3-minute public video | script below; upload to YouTube as **Public/Unlisted** | record after deploying |
 
 Re-export the deck after editing:
@@ -17,7 +17,7 @@ cd docs/submission && "/Applications/Google Chrome.app/Contents/MacOS/Google Chr
 ## Before you record or submit
 
 1. `gcloud auth login`, then `./deploy.sh` from the repo root.
-2. Add the `https://leafit-…run.app/*` URL to the browser Maps key's HTTP-referrer allow-list, or the map stays blank.
+2. The browser Maps key must allow `https://leafit.cloud.run/*` (the official link) and the service's `run.app` URL, or the map stays blank.
 3. Check the models in `backend/.env` (`LEAFIT_GEMINI_MODEL`, `LEAFIT_PLANNER_MODEL`) are available on **Vertex AI** in your project
    (`deploy.sh` passes them to Cloud Run). If a model isn't offered on Vertex, use `gemini-2.5-flash`.
 4. Run one plan on the live URL before recording (the first Earth Engine build of a new area takes ~10–30 s).
@@ -48,7 +48,7 @@ vendors get a ready quote request. Category: Sustainability. Runs on Cloud Run w
 
 ## Video script (≈3:00)
 
-Record on the **deployed URL** with QuickTime (File → New Screen Recording) at 1080p, voice over live. Before recording, open Lajpat Nagar
+Record on **https://leafit.cloud.run** with QuickTime (File → New Screen Recording) at 1080p, voice over live. Before recording, open Lajpat Nagar
 once so it is cached, and have a brief ready to paste.
 
 | Time | On screen | Say |
