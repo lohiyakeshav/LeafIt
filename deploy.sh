@@ -24,4 +24,4 @@ gcloud builds submit --config cloudbuild.yaml --substitutions "_IMAGE=$IMAGE,_MA
 # 180 s timeout: one planner run is several Gemini calls with thinking
 gcloud run deploy leafit --image "$IMAGE" --region "$REGION" --service-account "$SA" \
   --allow-unauthenticated --memory 2Gi --cpu 2 --timeout 180 \
-  --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT,LEAFIT_GEMINI_BACKEND=vertex,EE_PROJECT=$PROJECT,LEAFIT_GEMINI_MODEL=$MODEL,LEAFIT_PLANNER_MODEL=$PLANNER,GOOGLE_MAPS_SERVER_KEY=$SERVER_KEY"
+  --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT,LEAFIT_GEMINI_BACKEND=vertex,EE_PROJECT=$PROJECT,LEAFIT_GEMINI_MODEL=$MODEL,LEAFIT_PLANNER_MODEL=$PLANNER,GOOGLE_MAPS_SERVER_KEY=$SERVER_KEY,GOOGLE_MAPS_BROWSER_KEY=$MAPS_KEY"

@@ -64,6 +64,7 @@ After changing the model on purpose: edit `shared/model.json`, then `.venv/bin/p
 | Variable | Where | Purpose |
 |---|---|---|
 | `VITE_GOOGLE_MAPS_API_KEY` | `frontend/.env.local` | Browser key: Maps JavaScript, Places (New), Map Tiles |
+| `GOOGLE_MAPS_BROWSER_KEY` | backend env | The same browser key, served to the web app at runtime (`/config.js`); use it when the image is built without the build arg, e.g. Cloud Run's deploy-from-GitHub |
 | `GOOGLE_APPLICATION_CREDENTIALS` | backend env | Path to the Earth Engine service-account key. Defaults to `EarthCredentials.json` at the repo root |
 | `EE_PROJECT` | backend env | Earth Engine cloud project (defaults to the key's project) |
 | `GOOGLE_MAPS_SERVER_KEY` | backend env | Places (landmarks and real nearby vendors) and Air Quality. Without it there are no landmarks, no vendors and no AQI figure (nothing is made up) |

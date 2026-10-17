@@ -1,6 +1,7 @@
 // The real ground: Google Map Tiles API (2D, satellite) stitched into one canvas and cropped to the selected area.
 // The Map Tiles API is the Google product licensed for custom renderers like this one (Static/JS map imagery is not).
 // Tile math is pure and unit-tested; fetching needs VITE_GOOGLE_MAPS_API_KEY with "Map Tiles API" enabled.
+import { mapsKey } from '../shared/lib/mapsKey.js';
 
 const TILE = 256;
 const MAX_TEXTURE_PX = 1536; // caps a 1 km² area at ~25 tiles (z17): sharp enough for a stylised view, and each tile is a billable request
@@ -29,7 +30,7 @@ export function tilePlan(bounds, z) {
   return { z, x0, x1, y0, y1, cropX: left - x0 * TILE, cropY: top - y0 * TILE, cropW: right - left, cropH: bottom - top };
 }
 
-export const hasMapsKey = () => Boolean(import.meta.env.VITE_GOOGLE_MAPS_API_KEY);
+export const hasMapsKey = () => Boolean(mapsKey());
 
 let sessionPromise = null;
 function session(key) {
@@ -47,7 +48,7 @@ function session(key) {
  * the map page (same tiles) makes the Studio load near-instant.
  */
 export async function fetchSatellite(bounds, { signal } = {}) {
-  const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  const key = mapsKey();
   if (!key) throw new Error('No Google Maps key configured');
   const plan = tilePlan(bounds, pickZoom(bounds));
   const token = await session(key);

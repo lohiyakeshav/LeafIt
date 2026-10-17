@@ -30,3 +30,6 @@ EE_PROJECT = os.environ.get("EE_PROJECT")  # Earth Engine cloud project; falls b
 _key = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS") or str(ROOT / "EarthCredentials.json")  # git-ignored service-account key
 EE_KEY_FILE = Path(_key)
 GOOGLE_MAPS_SERVER_KEY = os.environ.get("GOOGLE_MAPS_SERVER_KEY")  # Places / Air Quality (server side)
+# Browser Maps key, handed to the web app at runtime (/config.js), so an image built without it (e.g. Cloud Run's GitHub deploy) still
+# shows maps. Public by nature: protect it with an HTTP-referrer restriction, not secrecy.
+GOOGLE_MAPS_BROWSER_KEY = os.environ.get("GOOGLE_MAPS_BROWSER_KEY", "")

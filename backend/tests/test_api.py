@@ -109,3 +109,11 @@ def test_page_urls_that_are_also_api_paths_serve_the_app_to_browsers(tmp_path, m
     assert page.status_code == 200 and "<title>LeafIt</title>" in page.text
     assert isinstance(client.get("/assumptions").json(), list)                                   # the app's own fetch
     assert client.get("/vendors", params={"block_id": "lajpat_nagar"}, headers={"accept": "text/html"}).text.startswith("<!doctype")
+
+
+def test_the_web_app_gets_the_browser_maps_key_at_runtime(api, monkeypatch):
+    from app import config
+    monkeypatch.setattr(config, "GOOGLE_MAPS_BROWSER_KEY", "browser-key")
+    r = api.get("/config.js")
+    assert r.headers["content-type"].startswith("application/javascript")
+    assert r.text == 'window.LEAFIT_CONFIG = {"mapsKey": "browser-key"};'
