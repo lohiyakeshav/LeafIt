@@ -1,5 +1,6 @@
 backend/data/plans
 backend/data/areas
+backend/data/fx
 **/.venv
 **/__pycache__
 app/*

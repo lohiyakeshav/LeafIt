@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Locate, SquareDashed, Trash2, Box, Plus, Minus, Check } from 'lucide-react';
 import { endpoints } from '../../api/endpoints.js';
-import { prefetch } from '../../app/lazyPages.js';
-import { forgetBlock } from '../../app/useBlock.js';
+import { prefetch } from '../../app/routes.js';
+import { forgetBlock } from '../../api/useBlock.js';
 import { AREA } from '../../model/rules.js';
-import { AccentText, CircleBtn, Glass, Kicker, Pill, PillToggle, Spinner, ThemeToggle, useTheme } from '../../shared/UI.jsx';
-import { fetchSatellite } from '../studio/diorama/satelliteTexture.js';
+import { AccentText, CircleBtn, Glass, Kicker, Pill, PillToggle, Spinner, ThemeToggle, CurrencyPicker, useTheme } from '../../shared/ui';
+import { fetchSatellite } from '../../api/mapTiles.js';
 import { boxAround, check, clampToMax, growToMin } from './areaLimits.js';
 import { hasKey, loadMaps } from './loadMaps.js';
 import { SATELLITE_STYLE, STREET_STYLE, STREET_STYLE_LIGHT } from './mapStyles.js';
@@ -221,6 +221,7 @@ export default function ExplorePage() {
           <span style={{ fontFamily: 'var(--font-sans)', fontSize: 15, fontWeight: 650, letterSpacing: '-0.02em' }}>LeafIt</span>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>/ new area</span>
           <div style={{ flex: 1 }} />
+          <CurrencyPicker />
           <ThemeToggle />
         </div>
       )}

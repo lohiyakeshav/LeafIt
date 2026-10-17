@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MapPin, Search, SquareDashed, Trees } from 'lucide-react';
-import { prefetch } from '../../app/lazyPages.js';
-import { delhiTime } from '../../shared/format.js';
-import { Reveal, Kicker, AccentText, Pill, Marquee, ThemeToggle } from '../../shared/UI.jsx';
-import { useWide } from '../../shared/AppBar.jsx';
+import { prefetch } from '../../app/routes.js';
+import { delhiTime } from '../../shared/lib/format.js';
+import { Reveal, Kicker, AccentText, Pill, Marquee, ThemeToggle, CurrencyPicker } from '../../shared/ui';
+import { useWide } from '../../shared/layout/useWide.js';
 
 const STEPS = [
   { icon: Search,       title: 'Find your place',  body: 'Search a neighbourhood or use your location.' },
@@ -49,6 +49,7 @@ export default function HomePage() {
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>v0.1 — 2026</span>
         <div style={{ flex: 1 }} />
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>New Delhi · {time}</span>
+        <CurrencyPicker />
         <ThemeToggle />
       </header>
 

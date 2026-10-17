@@ -2,7 +2,7 @@
 import numpy as np
 from scipy.ndimage import convolve
 
-from .sim import COOLING_CAP_C, KERNELS, MAX_TREES_PER_CELL, RULES, TYPES, Block, maturity
+from app.domain.sim import COOLING_CAP_C, KERNELS, MAX_TREES_PER_CELL, RULES, TYPES, Block, maturity, prices
 
 MAX_STEPS = 3000  # ponytail: one item per step; batch picks if blocks get much larger than ~100x100
 
@@ -24,7 +24,7 @@ def _weights(block: Block, goal: str, focus):
 
 
 def optimise(block: Block, budget: float, goal: str = "average", years: int = 10,
-             types=("tree", "cool_roof"), focus=()) -> list[dict]:
+             types=("tree", "cool_roof"), focus=(), unit_cost: dict | None = None) -> list[dict]:
     """Shaded bus stops are left out: they cut exposure, not °C, so they can't be ranked on the same scale."""
     grown = maturity(years)
     shape = block.lst.shape
@@ -35,8 +35,9 @@ def optimise(block: Block, budget: float, goal: str = "average", years: int = 10
     trees = np.zeros(shape)
     roofs = np.zeros(shape, bool)
     per_unit = {"tree": np.full(shape, grown), "cool_roof": block.building_frac}
-    unit_cost = {"tree": np.full(shape, float(TYPES["tree"]["cost"])),
-                 "cool_roof": np.where(block.roof_area > 0, block.roof_area * TYPES["cool_roof"]["cost"], np.inf)}
+    price = prices(unit_cost)   # the user's prices change what the budget buys, so they change the plan
+    unit_cost = {"tree": np.full(shape, price["tree"]),
+                 "cool_roof": np.where(block.roof_area > 0, block.roof_area * price["cool_roof"], np.inf)}
     left = float(budget)
 
     for _ in range(MAX_STEPS):

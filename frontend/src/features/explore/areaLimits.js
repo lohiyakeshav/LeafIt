@@ -1,4 +1,4 @@
-// The MVP area limits, mirrored from backend/app/geodata/grid.py (both read shared/model.json), so the map can say
+// The MVP area limits, mirrored from backend/app/domain/area/grid.py (both read shared/model.json), so the map can say
 // "too large" while the user drags instead of failing after they press Build.
 import { AREA } from '../../model/rules.js';
 

@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, Mail, MapPin, Star, Sprout, House, Bus } from 'lucide-react';
 import { endpoints } from '../../api/endpoints.js';
-import { useBlock } from '../../app/useBlock.js';
-import { useSession } from '../../app/store.js';
-import { Reveal, SectionHead, Spinner, Pill, ThemeToggle, useToast } from '../../shared/UI.jsx';
-import { BottomSheet } from '../../shared/MetricsBoard.jsx';
-import AppBar, { useWide } from '../../shared/AppBar.jsx';
+import { useBlock } from '../../api/useBlock.js';
+import { useSession } from '../../state/session.js';
+import { Reveal, SectionHead, Spinner, Pill, ThemeToggle, useToast, Dialog } from '../../shared/ui';
+import AppBar from '../../shared/layout/AppBar.jsx';
+import { useWide } from '../../shared/layout/useWide.js';
 
 const CATS = {
   nursery: { label: 'Nurseries', tag: 'NURSERY', icon: Sprout },
@@ -169,7 +169,7 @@ export default function VendorsPage() {
       </main>
 
       {quote && (
-        <BottomSheet onClose={() => setQuote(null)} width={600}>
+        <Dialog onClose={() => setQuote(null)} width={600}>
           <SectionHead kicker="Quote request" title={cleanName(quote.vendor.name)} size={28} />
           <pre style={{ marginTop: 18, padding: 18, background: 'var(--sunk)', border: '1px solid var(--rule)', borderRadius: 18, fontFamily: 'var(--font-mono)', fontSize: 12.5, color: 'var(--ink)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
             {quote.q.message}
@@ -184,7 +184,7 @@ export default function VendorsPage() {
               <Mail size={18} aria-hidden="true" /> Email
             </a>
           </div>
-        </BottomSheet>
+        </Dialog>
       )}
     </div>
   );

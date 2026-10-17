@@ -1,41 +1,35 @@
+// The Studio: place trees, cool roofs and shaded bus stops on the 3D twin and watch the live estimate.
+// This file owns the page's state and rules (what may go where); presentation pieces live in ./components.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, RotateCcw, Undo2, ArrowRight, Sparkles, Trees, House, Bus, Eraser, Brush, Camera, RotateCw, Locate, Plus, X, Share2 } from 'lucide-react';
-import { inr } from '../../shared/format.js';
-import HeatGrid from '../../shared/HeatGrid.jsx';
-import { HEAT_STOPS } from '../../shared/heatGrid.js';
-import { ImpactPanel, MetricWhyModal, BottomSheet } from '../../shared/MetricsBoard.jsx';
-import { Kicker, Pill, PillToggle, CircleBtn, Glass, Spinner, ThemeToggle, useToast } from '../../shared/UI.jsx';
-import { useBlock } from '../../app/useBlock.js';
-import { useSession } from '../../app/store.js';
+import { AnimatePresence } from 'framer-motion';
+import { ArrowLeft, RotateCcw, Undo2, ArrowRight, Sparkles, Brush } from 'lucide-react';
+import { inr } from '../../shared/lib/format.js';
+import { decodePlan } from '../../shared/lib/share.js';
+import HeatGrid from '../../shared/heatmap/HeatGrid.jsx';
+import { ImpactPanel } from '../../shared/metrics/ImpactPanel.jsx';
+import { MetricWhyModal } from '../../shared/metrics/MetricWhyModal.jsx';
+import { Dialog, Kicker, Pill, PillToggle, CircleBtn, Spinner, ThemeToggle, CurrencyPicker, LABEL, useToast } from '../../shared/ui';
+import { useBlock } from '../../api/useBlock.js';
+import { useSession } from '../../state/session.js';
 import { toGrid } from '../../model/grid.js';
 import { whyNot } from '../../model/rules.js';
 import { useSimulation } from '../../model/useSimulation.js';
 import AiSheet from './AiSheet.jsx';
-import { decodePlan, encodePlan, shareLink } from '../../shared/share.js';
-import PhotoAuditPanel from '../photo/PhotoAuditPanel.jsx';
+import { TOOLS, VIEW_OPTS, LAYER_OPTS, YEAR_OPTS, ITEM_CAP, PAINT_SPACING_M, DEFAULT_BUDGET } from './config.js';
+import { ToolCard, ExtraBtn } from './components/ToolCard.jsx';
+import { HeatLegend, TurnControl } from './components/StageOverlays.jsx';
+import { PlanOptions, CompareTable } from './components/PlanOptions.jsx';
+import { CostsPanel } from './components/CostsPanel.jsx';
 import Diorama from './diorama/Diorama.jsx';
 import { buildingsOf } from './diorama/geometry.js';
 import {
   MAX_TREES_PER_CELL, cellAt, fromCellPlacements, roofItem, stopItem, toCellPlacements, treeItem, treesInCell,
   withoutCell, withoutId, withoutNearest,
-} from './placements.js';
-
-const TOOLS = [
-  { value: 'tree',       label: 'Street tree',     short: 'Tree',  key: 'T', icon: Trees,  where: 'Streets and open ground', unit: ' each' },
-  { value: 'cool_roof',  label: 'Cool roof',       short: 'Roof',  key: 'R', icon: House,  where: 'Tap a building roof',     unit: ' / m²' },
-  { value: 'shade_stop', label: 'Shaded bus stop', short: 'Shade', key: 'B', icon: Bus,    where: 'Roads only',              unit: ' each' },
-  { value: 'erase',      label: 'Erase',           short: 'Erase', key: 'E', icon: Eraser, where: 'Remove what you tap',     unit: '' },
-];
-const VIEW_OPTS  = [{ value: false, label: 'Today' }, { value: true, label: 'With plan' }];
-const LAYER_OPTS = [{ value: 'heat', label: 'Heat' }, { value: 'sat', label: 'Satellite' }];
-const YEAR_OPTS  = [{ value: 1, label: 'Yr 1' }, { value: 10, label: 'Yr 10' }, { value: 20, label: 'Yr 20' }];
-const ITEM_CAP = 5000;       // the API accepts at most 5000 placements
-const PAINT_SPACING_M = 5;   // trees dropped while painting are at least this far apart
+} from '../../model/placements.js';
 
 // zustand actions are stable references, so they can live outside the component and out of every dependency list
-const { openBlock, setItems, undo, clear, setTool, setShowAfter, setYears, setBudget, beginStroke, strokeSet, saveOption, loadOption, removeOption } = useSession.getState();
+const { openBlock, setItems, undo, clear, setTool, setShowAfter, setYears, setBudget, setUnitCost, beginStroke, strokeSet, saveOption, loadOption, removeOption } = useSession.getState();
 
 export default function StudioPage() {
   const { id } = useParams();
@@ -49,6 +43,7 @@ export default function StudioPage() {
   const showAfter = useSession((s) => s.showAfter);
   const years = useSession((s) => s.years);
   const budget = useSession((s) => s.budget);
+  const userPrices = useSession((s) => s.unitCost);
   const canUndo = useSession((s) => s.history.length > 0);
   const options = useSession((s) => s.options);
 
@@ -72,14 +67,8 @@ export default function StudioPage() {
     });
   }, [ready, grid]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const share = async () => {
-    try {
-      const url = `${location.origin}${location.pathname}?plan=${await encodePlan(items, years)}`;
-      if ((await shareLink(url, `LeafIt plan · ${block.name}`)) === 'copied') toast('Link copied: anyone can open this plan');
-    } catch (e) { if (e?.name !== 'AbortError') toast('Could not share the link'); }
-  };
   const cellPlacements = useMemo(() => (ready ? toCellPlacements(items) : []), [ready, items]);
-  const sim = useSimulation(ready ? block : null, cellPlacements, years);
+  const sim = useSimulation(ready ? block : null, cellPlacements, years, userPrices);
 
   const [layer, setLayer] = useState('heat');
   const [paint, setPaint] = useState(false);
@@ -88,7 +77,6 @@ export default function StudioPage() {
   const [flat, setFlat] = useState(false);          // WebGL unavailable: fall back to the 2D grid
   const [whyKey, setWhyKey] = useState(null);
   const [showAi, setShowAi] = useState(false);
-  const [showPhoto, setShowPhoto] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
   const [wide, setWide] = useState(window.innerWidth >= 1000);
   const view = useRef(null);
@@ -99,7 +87,6 @@ export default function StudioPage() {
     window.addEventListener('resize', on);
     return () => window.removeEventListener('resize', on);
   }, []);
-  useEffect(() => { if (tool !== 'tree') setPaint(false); }, [tool]);
   // Keyboard: T / R / B / E pick a tool, ⌘Z or Ctrl+Z undoes (not while typing in a field)
   useEffect(() => {
     const keys = { t: 'tree', r: 'cool_roof', b: 'shade_stop', e: 'erase' };
@@ -201,8 +188,6 @@ export default function StudioPage() {
   const live = block.conditions;
   const source = block.synthetic ? 'SYNTHETIC STAND-IN' : 'SATELLITE DATA';
   const goReview = items.length ? () => navigate('/summary') : null;
-  const unitCost = sim.breakdown?.unit_cost ?? {};
-  const priceOf = (t) => unitCost[t.value] == null ? '' : `${inr(unitCost[t.value])}${t.unit}`;
 
   const title = (
     <div style={{ flex: 1, minWidth: 0 }}>
@@ -220,7 +205,7 @@ export default function StudioPage() {
       {wide ? title : <div style={{ flex: 1 }} />}
       <CircleBtn icon={Undo2} tooltip="Undo" onClick={canUndo ? undo : undefined} disabled={!canUndo} />
       <CircleBtn icon={RotateCcw} tooltip="Start over" onClick={items.length ? clear : undefined} disabled={!items.length} />
-      <CircleBtn icon={Share2} tooltip="Share this plan as a link" onClick={items.length ? share : undefined} disabled={!items.length} />
+      <CurrencyPicker />
       {wide && <ThemeToggle />}   {/* on phones the header is full; the toggle lives on Home, Explore and Summary */}
       {wide && <Pill label="Ask AI to plan" icon={Sparkles} kind="outline" dense height={40} onClick={() => setShowAi(true)} />}
       <Pill label="Review" icon={ArrowRight} dense height={40} onClick={goReview ?? undefined} disabled={!goReview} />
@@ -229,7 +214,7 @@ export default function StudioPage() {
   );
 
   const toolCards = TOOLS.map((t) => (
-    <ToolCard key={t.value} tool={t} price={priceOf(t)} active={tool === t.value} compact={!wide} onClick={() => setTool(t.value)} />
+    <ToolCard key={t.value} tool={t} active={tool === t.value} compact={!wide} onClick={() => setTool(t.value)} />
   ));
 
   const viewControls = (
@@ -241,10 +226,10 @@ export default function StudioPage() {
   );
 
   const canPaint = tool === 'tree' && !flat;
+  const painting = paint && canPaint;   // switching tool simply stops painting; no effect needed
   const extras = (
     <>
-      {canPaint && <ExtraBtn icon={Brush} label={wide ? (paint ? 'Painting: drag to plant' : 'Paint trees by dragging') : 'Paint'} active={paint} onClick={() => setPaint((p) => !p)} compact={!wide} />}
-      <ExtraBtn icon={Camera} label={wide ? 'Check a street photo' : 'Street photo'} onClick={() => setShowPhoto(true)} compact={!wide} />
+      {canPaint && <ExtraBtn icon={Brush} label={painting ? 'Painting…' : 'Paint trees'} active={painting} onClick={() => setPaint((p) => !p)} compact />}
     </>
   );
 
@@ -256,7 +241,7 @@ export default function StudioPage() {
   ) : (
     <div style={{ position: 'relative', width: '100%', height: wide ? '100%' : 'min(62dvh, 560px)', minHeight: 320, borderRadius: 'var(--radius)', overflow: 'hidden', border: '1px solid var(--rule)', background: 'var(--sunk)' }}>
       <Diorama
-        ref={view} block={block} grid={grid} items={items} years={years} tool={tool} paintMode={paint}
+        ref={view} block={block} grid={grid} items={items} years={years} tool={tool} paintMode={painting}
         cooling={sim.cooling} showAfter={showAfter} heatOpacity={heatOpacity}
         validate={(t) => check(t, items)} onPlace={place} onErase={erase}
         onPaintStart={paintStart} onPaint={paintMove} onPaintEnd={() => { lastPaint.current = null; }}
@@ -268,6 +253,12 @@ export default function StudioPage() {
         {sat?.ok ? sat.copyright : sat?.error === 'no-key' ? 'Add VITE_GOOGLE_MAPS_API_KEY to show the real satellite photo' : sat?.ok === false && sat.error !== 'synthetic' ? 'Satellite photo unavailable, showing a painted map' : ''}
       </div>
     </div>
+  );
+
+  const costsPanel = (
+    <CostsPanel unitCost={userPrices} budget={budget} compact={!wide}
+      onPrice={(t, v) => setUnitCost({ ...(userPrices ?? {}), [t]: v })} onBudget={setBudget}
+      onReset={() => { setUnitCost(null); setBudget(DEFAULT_BUDGET); toast('Prices and budget reset'); }} />
   );
 
   const optionsPanel = (
@@ -309,10 +300,11 @@ export default function StudioPage() {
           <section style={{ minHeight: 0, display: 'grid', gridTemplateColumns: '208px minmax(0, 1fr)', gap: 24, padding: '24px 32px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0, overflowY: 'auto' }}>
               <div style={{ ...LABEL, marginBottom: 2 }}>PLACE</div>
-              {toolCards}
-              {extras}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>{toolCards}</div>
+              <div style={{ display: 'flex', gap: 6 }}>{extras}</div>
               <div style={{ ...LABEL, marginTop: 12, marginBottom: 2 }}>VIEW</div>
               {viewControls}
+              <div style={{ marginTop: 10 }}>{costsPanel}</div>
             </div>
             <div style={{ minHeight: 0 }}>{stage}</div>
           </section>
@@ -334,6 +326,7 @@ export default function StudioPage() {
             <div style={{ padding: '24px var(--gutter) 32px', display: 'flex', flexDirection: 'column', gap: 24 }}>
               {impact}
               {optionsPanel}
+              {costsPanel}
               {help}
               {note}
             </div>
@@ -359,7 +352,7 @@ export default function StudioPage() {
       <AnimatePresence>
         {showAi && (
           <AiSheet
-            block={block} years={years} budget={budget} onBudget={setBudget}
+            block={block} years={years} budget={budget} unitCost={userPrices} onBudget={setBudget}
             onApply={(pls) => {
               // keep the user's own plan so it can be compared with the AI's
               if (items.length && !options.some((o) => o.items === items)) saveOption(sim.metrics, 'Your plan');
@@ -371,160 +364,11 @@ export default function StudioPage() {
       </AnimatePresence>
       <AnimatePresence>
         {showCompare && (
-          <BottomSheet onClose={() => setShowCompare(false)}>
+          <Dialog onClose={() => setShowCompare(false)}>
             <CompareTable options={options} current={items.length && !options.some((o) => o.items === items) ? { label: 'Current', years, metrics: sim.metrics } : null} />
-          </BottomSheet>
+          </Dialog>
         )}
       </AnimatePresence>
-      <AnimatePresence>
-        {showPhoto && (
-          <BottomSheet onClose={() => setShowPhoto(false)}>
-            <PhotoAuditPanel onClose={() => setShowPhoto(false)} onUseTool={(t) => { setTool(t); setShowPhoto(false); }} />
-          </BottomSheet>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-const LABEL = { fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.04em', color: 'var(--muted)' };
-
-function ToolCard({ tool: t, price, active, compact, onClick }) {
-  const Icon = t.icon;
-  return (
-    <motion.button
-      onClick={onClick}
-      whileTap={{ scale: 0.97 }}
-      aria-pressed={active}
-      style={{
-        display: 'flex', alignItems: 'center', gap: compact ? 5 : 12, textAlign: 'left',
-        flexDirection: compact ? 'column' : 'row', justifyContent: compact ? 'center' : 'flex-start',
-        padding: compact ? '8px 2px' : '10px 14px', borderRadius: 14,
-        border: `1px solid ${active ? 'var(--accent)' : 'var(--rule)'}`,
-        background: active ? 'var(--accent-soft)' : 'transparent',
-        transition: 'border-color 0.2s, background 0.2s',
-      }}
-    >
-      <Icon size={compact ? 18 : 20} color={active ? 'var(--accent)' : 'var(--ink)'} />
-      <div style={{ minWidth: 0, textAlign: compact ? 'center' : 'left' }}>
-        <div style={{ fontSize: compact ? 12 : 14.5, fontWeight: 600, letterSpacing: '-0.01em', color: active ? 'var(--accent)' : 'var(--ink)' }}>{compact ? t.short : t.label}</div>
-        {!compact && <div style={{ marginTop: 3, fontSize: 12, color: 'var(--muted)', lineHeight: 1.35 }}><span className="sr-only">Shortcut {t.key}. </span>{t.where}{price && <> · <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, whiteSpace: 'nowrap' }}>{price}</span></>}</div>}
-      </div>
-    </motion.button>
-  );
-}
-
-/** Secondary actions: a quiet text row in the rail, an outlined chip on phones. */
-function ExtraBtn({ icon: Icon, label, active, onClick, compact }) {
-  return (
-    <button onClick={onClick} title={label} aria-pressed={active}
-      style={{
-        display: 'flex', alignItems: 'center', justifyContent: compact ? 'center' : 'flex-start', gap: compact ? 6 : 10, whiteSpace: 'nowrap',
-        flex: compact ? 1 : undefined, height: compact ? 34 : undefined, padding: compact ? 0 : '8px 14px', borderRadius: compact ? 999 : 12,
-        border: `1px solid ${active ? 'var(--accent)' : compact ? 'var(--rule)' : 'transparent'}`,
-        color: active ? 'var(--accent)' : 'var(--ink-soft)', fontSize: 13,
-      }}>
-      <Icon size={16} />
-      {label}
-    </button>
-  );
-}
-
-/** What the heat colours mean: the area's own surface-temperature range (hot-season satellite baseline). */
-function HeatLegend({ lo, hi }) {
-  const bar = `linear-gradient(to right, ${HEAT_STOPS.map(([r, g, b]) => `rgb(${r},${g},${b})`).join(',')})`;
-  return (
-    <div style={{ position: 'absolute', left: 12, top: 10, pointerEvents: 'none' }}>
-      <Glass radius={14} padding="9px 12px">
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--muted)', marginBottom: 6 }}>SURFACE HEAT · HOT SEASON</div>
-        <div style={{ width: 170, height: 6, borderRadius: 3, background: bar }} />
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink)', marginTop: 5 }}>
-          <span>{lo.toFixed(1)} °C</span><span>{hi.toFixed(1)} °C</span>
-        </div>
-      </Glass>
-    </div>
-  );
-}
-
-/** Quick quarter turns and a reset; everything else is direct: drag to turn and tilt, right-drag to move, scroll to zoom. */
-function TurnControl({ azimuth, onTurn, onReset }) {
-  return (
-    <div style={{ position: 'absolute', right: 12, bottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-      <CircleBtn icon={RotateCcw} tooltip="Turn left" onClick={() => onTurn(azimuth - Math.PI / 4)} />
-      <CircleBtn icon={RotateCw} tooltip="Turn right" onClick={() => onTurn(azimuth + Math.PI / 4)} />
-      <CircleBtn icon={Locate} tooltip="Reset view" onClick={onReset} />
-    </div>
-  );
-}
-
-/** Saved plan variants: save the current plan, load one back, compare them all. */
-function PlanOptions({ options, canSave, onSave, onLoad, onRemove, onCompare }) {
-  return (
-    <section aria-labelledby="options-h">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-        <h2 id="options-h" style={{ ...LABEL, fontWeight: 400 }}>PLAN OPTIONS</h2>
-        {options.length + (canSave ? 1 : 0) >= 2 && <button onClick={onCompare} style={{ ...LABEL, color: 'var(--accent)', padding: '6px 0' }}>COMPARE {options.length + (canSave ? 1 : 0)} →</button>}
-      </div>
-      {options.map((o) => (
-        <div key={o.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 10, alignItems: 'center', padding: '9px 0', borderBottom: '1px solid var(--rule)', fontSize: 13.5 }}>
-          <button onClick={() => onLoad(o)} title={`Load ${o.label}`} style={{ textAlign: 'left', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {o.label} <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--muted)' }}>· {o.items.length} items · yr {o.years}</span>
-          </button>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5, color: 'var(--accent)' }}>{fmtDeg(o.metrics?.temp_reduction_c)}</span>
-          <button onClick={() => onRemove(o)} aria-label={`Delete ${o.label}`} title="Delete" style={{ color: 'var(--muted)', padding: 4, lineHeight: 0 }}><X size={14} /></button>
-        </div>
-      ))}
-      <button onClick={canSave ? onSave : undefined} disabled={!canSave}
-        style={{ marginTop: 10, width: '100%', padding: '10px 14px', borderRadius: 12, border: '1px dashed var(--rule)', color: canSave ? 'var(--ink)' : 'var(--muted)', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: canSave ? 'pointer' : 'default' }}>
-        <Plus size={15} aria-hidden="true" /> {options.length ? 'Save this plan as another option' : 'Save this plan to compare'}
-      </button>
-    </section>
-  );
-}
-
-const fmtDeg = (v) => { const x = Math.abs(Number(v ?? 0)); return `${x >= 0.005 ? '−' : ''}${x.toFixed(2)}°`; };
-const ROWS = [
-  ['Street cooling', (m) => m.temp_reduction_c, fmtDeg, 'max'],
-  ['Hottest spot', (m) => m.peak_reduction_c, (v) => fmtDeg(v).replace(/(\.\d)\d/, '$1'), 'max'],
-  ['Still too hot', (m) => m.heat_exposure_pct, (v) => `${Math.round(v)}%`, 'min'],
-  ['CO₂ per year', (m) => m.co2_captured_kg_per_year, (v) => `${(v / 1000).toFixed(1)} t`, 'max'],
-  ['Cost', (m) => m.total_cost_inr, inr, 'min'],
-  ['₹ per °C', (m) => m.cost_per_degree_inr, (v) => (v == null ? '—' : inr(v)), 'min'],
-];
-
-/** Side-by-side table; the best value in each row is highlighted. */
-function CompareTable({ options, current }) {
-  const cols = [...options, ...(current?.metrics ? [current] : [])];
-  return (
-    <div style={{ padding: '0 4px 24px' }}>
-      <div style={{ ...LABEL, marginBottom: 10 }}>COMPARE PLANS</div>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontVariantNumeric: 'tabular-nums' }}>
-          <thead>
-            <tr>
-              <th scope="col" style={{ textAlign: 'left', padding: '8px 0' }} />
-              {cols.map((c) => <th key={c.label} scope="col" style={{ textAlign: 'right', padding: '8px 0 8px 16px', fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap' }}>{c.label}<div style={{ ...LABEL, fontSize: 10.5 }}>YEAR {c.years}</div></th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {ROWS.map(([name, get, fmt, better]) => {
-              const vals = cols.map((c) => (c.metrics ? get(c.metrics) : null));
-              const nums = vals.filter((v) => v != null && Number.isFinite(Number(v))).map(Number);
-              const best = nums.length > 1 ? (better === 'max' ? Math.max(...nums) : Math.min(...nums)) : null;
-              return (
-                <tr key={name} style={{ borderTop: '1px solid var(--rule)' }}>
-                  <th scope="row" style={{ textAlign: 'left', padding: '11px 0', fontSize: 13.5, fontWeight: 400, color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>{name}</th>
-                  {vals.map((v, i) => {
-                    const win = best != null && v != null && fmt(v) === fmt(best);   // ties as displayed, not to the 5th decimal
-                    return <td key={i} style={{ textAlign: 'right', padding: '11px 0 11px 16px', fontFamily: 'var(--font-mono)', fontSize: 13, color: win ? 'var(--accent)' : 'var(--ink)', fontWeight: win ? 600 : 400 }}>{fmt(v)}{win && <span className="sr-only"> (best)</span>}</td>;
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <p style={{ marginTop: 14, fontSize: 12.5, color: 'var(--muted)' }}>Best value in each row is highlighted. Tap an option in the panel to load it back.</p>
     </div>
   );
 }

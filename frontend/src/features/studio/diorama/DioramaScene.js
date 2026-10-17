@@ -9,7 +9,7 @@
 //   * pixel ratio capped at 1.5; everything is disposed in dispose()
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { heatColor } from '../../../shared/heatGrid.js';
+import { heatColor } from '../../../shared/heatmap/draw.js';
 import { maturity } from '../../../model/rules.js';
 import { buildIndex, groundHit, pickBuilding } from './geometry.js';
 import { makeTreeAtlas, TREE_VARIANTS } from './sprites.js';

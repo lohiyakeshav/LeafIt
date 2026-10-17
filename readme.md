@@ -11,40 +11,32 @@ Search for a real place, mark out your neighbourhood on the satellite map, and t
 2. **Build the area.** `POST /areas` fetches real data from Google Earth Engine: Landsat surface temperature, ESA WorldCover land cover, and Open Buildings footprints and heights. It also adds live weather, air quality and nearby landmarks. Built areas are cached.
 3. **Work on it in 2.5D.** `/area/:id` is a three.js isometric diorama with the satellite photo as the ground. Place trees (or paint them by dragging), coat roofs, add shaded stops, erase, undo, and turn the view.
 4. **Live numbers.** The cooling model runs in a Web Worker in your browser on every change. The server runs the same model for Review, saved plans and the agent.
-5. **Plan, quote, share.** Review gives the server-computed before/after, a bill of materials, a funding proposal and vendor quote links.
+5. **Review and build.** Review shows the measured heat against your plan on the satellite photo, with a bill of materials and a funding proposal; Vendors finds suppliers within 25 km and writes the quote request.
+6. **Your prices, your currency.** Tree, cool-roof and bus-stop prices and the budget are editable; money can be shown in 14 currencies at today's rates (all maths stays in INR).
 
 ## Architecture
 
+New to the code? Read **[ARCHITECTURE.md](ARCHITECTURE.md)**: how the pieces fit, the dependency rules, and a "where do I…" table. Package maps: [backend/README.md](backend/README.md), [frontend/README.md](frontend/README.md).
+
 ```
-shared/
-  model.json            model coefficients, placement rules, area limits (the single source of truth)
-  fixtures/golden.json  cases replayed by BOTH test suites, so browser and server cannot drift
-backend/app/            FastAPI
-  routers/              one file per resource (blocks, areas, simulate, agent, photo, plans, vendors)
-  domain/               sim.py (cooling model), optimise.py (greedy planner), market.py (BOM, vendors)
-  agents/               Gemini planner, photo audit, proposal writer
-  geodata/              Earth Engine, live conditions, Places landmarks, area assembly
-  store.py              persistence behind one interface (files today, Firestore later)
-frontend/src/           React 19 + Vite
-  features/             home, explore (map), studio (diorama), summary, vendors, method, photo
-  model/                browser simulator, its Web Worker, and parity tests
-  app/                  routes (lazy loaded), session store, block loader
+shared/      model.json (the model's numbers and rules, read by both simulators) + golden fixtures
+backend/     FastAPI: api/ → services/ → domain/, agents/, integrations/, storage/
+frontend/    React: app/, features/ (one per page), model/ (simulator), shared/ (ui, layout, metrics, lib), state/, api/
 ```
 
 Performance choices: the three.js scene renders only when something changes (an idle GPU does nothing), uses about 9 draw calls (all buildings are one mesh, trees are GPU-billboarded instances), and loads only on the Studio route. The Maps SDK loads only on the Explore route. The simulator never blocks the UI thread.
 
 ## Setup
 
-Requires conda, Node 22+ and Docker (only for the image).
+Requires Python 3.12, Node 22+ and Docker (only for the image).
 
 ### 1. Backend
 
 ```bash
-conda create -n leafit python=3.12 -y
-conda activate leafit
-pip install -r backend/requirements.txt
 cd backend
-uvicorn app.main:app --reload --port 8000
+python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+cp .env.example .env              # add keys (see Configuration)
+.venv/bin/uvicorn app.main:app --reload --port 8000
 ```
 
 ### 2. Web app
@@ -56,16 +48,15 @@ npm install
 npm run dev                       # http://localhost:5173 (API calls are proxied to :8000)
 ```
 
-### 3. Tests
+### 3. Tests and lint
 
 ```bash
-cd backend  && python test_backend.py      # backend suite, golden fixtures, area pipeline (no network needed)
-cd frontend && npm test                    # browser simulator parity, geometry, placements, limits, tiles
-cd frontend && npm run build               # production build
-python backend/scripts/ee_smoke.py         # LIVE Earth Engine check (needs the setup below)
+cd backend  && .venv/bin/python -m pytest && .venv/bin/ruff check .   # 46 tests, offline; lint
+cd frontend && npm test && npm run lint && npm run build               # simulator parity, geometry, money…; lint; build
+cd backend  && .venv/bin/python scripts/ee_smoke.py                    # LIVE Earth Engine check (needs credentials)
 ```
 
-After changing the model on purpose: edit `shared/model.json`, then `python backend/scripts/make_golden.py` and re-run both suites.
+After changing the model on purpose: edit `shared/model.json`, then `.venv/bin/python scripts/make_golden.py` (from `backend/`) and re-run both suites.
 
 ## Configuration
 
@@ -75,7 +66,7 @@ After changing the model on purpose: edit `shared/model.json`, then `python back
 | `GOOGLE_APPLICATION_CREDENTIALS` | backend env | Path to the Earth Engine service-account key. Defaults to `EarthCredentials.json` at the repo root |
 | `EE_PROJECT` | backend env | Earth Engine cloud project (defaults to the key's project) |
 | `GOOGLE_MAPS_SERVER_KEY` | backend env | Optional: Places landmarks and Air Quality. Without it landmarks are empty and AQI uses a default |
-| `GEMINI_API_KEY` | backend env | Planner agent, photo audit, proposals. Without it the planner uses simple rules and the photo audit is disabled |
+| `GEMINI_API_KEY` | backend env | Planner agent and funding proposals. Without it the planner uses simple rules and proposals use a template |
 | `LEAFIT_ALLOW_SYNTHETIC_AREAS=1` | backend env | Dev only: if Earth Engine is unreachable, build a clearly labelled **synthetic stand-in** instead of an error |
 
 Templates: `frontend/.env.example`, `backend/.env.example`. Real keys are never committed: `.env*` files and credential JSON files are excluded from git, Docker builds and `gcloud --source` uploads.
@@ -88,7 +79,7 @@ docker build --build-arg VITE_GOOGLE_MAPS_API_KEY=<browser key> -t leafit .
 docker run -p 8080:8080 -e GEMINI_API_KEY=... -e EE_PROJECT=... leafit
 ```
 
-One container serves the API and the built web app. On Cloud Run, do not ship a key file: attach a service account (with the two Earth Engine roles above) to the service. Built areas are cached on local disk, which Cloud Run loses on restart; move `store.py` to Firestore or GCS when that matters.
+One container serves the API and the built web app. On Cloud Run, do not ship a key file: attach a service account (with the two Earth Engine roles above) to the service. Built areas are cached on local disk, which Cloud Run loses on restart; move `backend/app/storage/store.py` to Firestore or GCS when that matters.
 
 ## Known limits
 

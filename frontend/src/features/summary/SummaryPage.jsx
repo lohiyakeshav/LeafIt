@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
-import { Package, MapPin, Edit3, Copy, Printer, Share2, Check, FileText } from 'lucide-react';
+import { Package, MapPin, Edit3, Copy, Printer, Check, FileText } from 'lucide-react';
 import { endpoints } from '../../api/endpoints.js';
-import { useBlock } from '../../app/useBlock.js';
-import { useSession } from '../../app/store.js';
-import { toCellPlacements } from '../studio/placements.js';
+import { useBlock } from '../../api/useBlock.js';
+import { useSession } from '../../state/session.js';
+import { toCellPlacements } from '../../model/placements.js';
 import PlanCompare from './PlanCompare.jsx';
-import { MetricWhyModal, BottomSheet } from '../../shared/MetricsBoard.jsx';
-import AppBar, { Card, useWide } from '../../shared/AppBar.jsx';
-import { inr } from '../../shared/format.js';
-import { Reveal, CircleBtn, Pill, Spinner, ThemeToggle, useToast } from '../../shared/UI.jsx';
-import { encodePlan, shareLink } from '../../shared/share.js';
-import { flattenGrid } from '../../shared/heatGrid.js';
+import { MetricWhyModal } from '../../shared/metrics/MetricWhyModal.jsx';
+import { Dialog, Reveal, Pill, Spinner, ThemeToggle, useToast } from '../../shared/ui';
+import AppBar from '../../shared/layout/AppBar.jsx';
+import { Card } from '../../shared/layout/Card.jsx';
+import { useWide } from '../../shared/layout/useWide.js';
+import { inr, displayCurrency } from '../../shared/lib/format.js';
+import { flattenGrid } from '../../shared/heatmap/draw.js';
 
 
 export default function SummaryPage() {
@@ -26,6 +27,7 @@ export default function SummaryPage() {
   const years = useSession((st) => st.years);
   const storedPlan = useSession((st) => st.plan);
   const budget = useSession((st) => st.budget);
+  const userPrices = useSession((st) => st.unitCost);
   const [whyKey, setWhyKey] = useState(null);
   const [showProposal, setShowProposal] = useState(false);
   const { block } = useBlock(blockId);
@@ -45,11 +47,11 @@ export default function SummaryPage() {
   useEffect(() => {
     if (!block || !placements.length) return undefined;
     let alive = true;
-    endpoints.simulate(block.id, placements, years)
+    endpoints.simulate(block.id, placements, years, userPrices)
       .then((r) => alive && setCanon({ metrics: r.metrics, breakdown: r.breakdown, cooling: flattenGrid(r.cooling_grid) }))
       .catch((e) => alive && setError(e.message));
     return () => { alive = false; };
-  }, [block, placements, years]);
+  }, [block, placements, years, userPrices]);
 
   async function save() {
     setSaving(true);
@@ -59,6 +61,7 @@ export default function SummaryPage() {
         block_id: block.id,
         placements: placements.map(p => ({ type: p.type, row: p.row, col: p.col, count: p.count })),
         years,
+        unit_cost: userPrices ?? undefined,   // the saved plan keeps the prices it was costed with
         name: planName.trim() || 'Untitled plan',
       });
       const id = res.id;
@@ -78,7 +81,7 @@ export default function SummaryPage() {
     setWriting(true);
     setError(null);
     try {
-      const res = await endpoints.planProposal(planId);
+      const res = await endpoints.planProposal(planId, displayCurrency().code);
       setProposal(res.text);
       setPropSource(res.source);
       setShowProposal(true);
@@ -92,18 +95,7 @@ export default function SummaryPage() {
   const wide = useWide();
   const noPlan = !blockId || !placements.length;
   const blockName = block?.name.replace(' (synthetic demo)', '') ?? '';
-  const barActions = !noPlan && block && (
-    <>
-      <CircleBtn icon={Share2} tooltip="Share this plan as a link" onClick={async () => {
-        try {
-          const url = `${location.origin}/${blockId.startsWith('a_') ? 'area' : 'block'}/${blockId}?plan=${await encodePlan(items, years)}`;
-          if ((await shareLink(url, `LeafIt plan · ${blockName}`)) === 'copied') toast('Link copied: anyone can open this plan');
-        } catch (e) { if (e?.name !== 'AbortError') toast('Could not share the link'); }
-      }} />
-      <ThemeToggle />
-      {wide && <Pill label="Save as PDF" icon={Printer} kind="outline" dense height={40} onClick={() => window.print()} />}
-    </>
-  );
+  const barActions = <ThemeToggle />;
 
   if (noPlan) return (
     <div style={{ minHeight: '100dvh' }}>
@@ -130,7 +122,7 @@ export default function SummaryPage() {
     ['co2', 'CO₂ captured', `${(Number(m.co2_captured_kg_per_year ?? 0) / 1000).toFixed(1)} t`, 'per year'],
     ['exposure', 'Still too hot', `${Math.round(Number(m.heat_exposure_pct ?? 0))}%`, 'of outdoors'],
     ['cost', 'Total cost', inr(Number(m.total_cost_inr ?? 0)), Number(m.total_cost_inr ?? 0) > budget ? `over ${inr(budget)} budget` : `of ${inr(budget)} budget`],
-    ['per_degree', '₹ per °C', m.cost_per_degree_inr == null ? '—' : inr(Number(m.cost_per_degree_inr)), 'value for money'],
+    ['per_degree', 'Cost per °C', m.cost_per_degree_inr == null ? '—' : inr(Number(m.cost_per_degree_inr)), 'value for money'],
   ];
 
   const step = (n, title, done, active, body) => (
@@ -226,13 +218,13 @@ export default function SummaryPage() {
       </AnimatePresence>
       <AnimatePresence>
         {showProposal && proposal && (
-          <BottomSheet onClose={() => setShowProposal(false)} width={860}>
+          <Dialog onClose={() => setShowProposal(false)} width={860}>
             <div style={{ display: 'flex', gap: 8, marginBottom: 14, paddingRight: 44 }}>
               <Pill label="Copy text" icon={Copy} kind="outline" dense onClick={() => { navigator.clipboard.writeText(proposal); toast('Proposal copied'); }} />
               <Pill label="Print / PDF" icon={Printer} kind="outline" dense onClick={() => window.print()} />
             </div>
             <ProposalDocument text={proposal} gemini={propSource === 'gemini'} />
-          </BottomSheet>
+          </Dialog>
         )}
       </AnimatePresence>
     </div>

@@ -2,6 +2,7 @@
 **/__pycache__
 backend/data/plans
 backend/data/areas
+backend/data/fx
 app/*
 docs
 .git

@@ -14,8 +14,16 @@ if _env.exists():
             os.environ.setdefault(_k.strip(), _v.strip().strip('"\''))
 MODEL = json.loads(Path(os.environ.get("LEAFIT_MODEL_JSON", ROOT / "shared/model.json")).read_text())
 
-BLOCKS_DIR = Path(__file__).parents[1] / "data/blocks"
-AREAS_DIR = Path(__file__).parents[1] / "data/areas"
+# Data on disk (backend/data). Everything that reads or writes files gets its folder from here, never from __file__.
+DATA_DIR = Path(os.environ.get("LEAFIT_DATA_DIR", Path(__file__).parents[1] / "data"))
+BLOCKS_DIR = DATA_DIR / "blocks"     # shipped sample blocks (read-only)
+AREAS_DIR = DATA_DIR / "areas"       # areas built from satellite data (cache)
+PLANS_DIR = DATA_DIR / "plans"       # saved plans
+FX_DIR = DATA_DIR / "fx"             # one exchange-rate snapshot per day
+VENDORS_FILE = DATA_DIR / "vendors.json"
+# Saved plans and built areas are a cache, not an archive: nothing in the app lists old ones, so they expire.
+PLAN_TTL_DAYS = float(os.environ.get("LEAFIT_PLAN_TTL_DAYS", 7))     # long enough to finish review, quotes, proposal
+AREA_TTL_DAYS = float(os.environ.get("LEAFIT_AREA_TTL_DAYS", 30))    # rebuilt from satellite data if asked for again
 WEB_DIR = Path(os.environ.get("LEAFIT_WEB_DIR", ROOT / "frontend/dist"))
 
 EE_PROJECT = os.environ.get("EE_PROJECT")  # Earth Engine cloud project; falls back to the service account's project

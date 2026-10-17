@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowUpRight } from 'lucide-react';
 import { endpoints } from '../../api/endpoints.js';
-import { Reveal, SectionHead, CircleBtn, Spinner, Kicker } from '../../shared/UI.jsx';
+import { Reveal, SectionHead, CircleBtn, Spinner, Kicker } from '../../shared/ui';
 
 const STATUS_COLOR = {
   cited: 'var(--accent)',

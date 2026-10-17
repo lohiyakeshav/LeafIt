@@ -69,7 +69,11 @@ export function validate(grid, placements) {
  * @param placements  cell-form [{type, row, col, count}]
  * @returns {metrics, cooling (Float32Array rows*cols, surface °C), breakdown, estimated}
  */
-export function simulate(grid, placements, years = 10) {
+/** unitCost: the user's prices ({ tree, cool_roof, shade_stop } in ₹); anything missing uses the sourced default. */
+export const prices = (unitCost) => Object.fromEntries(Object.entries(TYPES).map(([t, v]) => [t, Number(unitCost?.[t]) || v.cost]));
+
+export function simulate(grid, placements, years = 10, unitCost = null) {
+  const price = prices(unitCost);
   validate(grid, placements);
   const { rows, cols, lst, bf, roof, cellM } = grid;
   const n = rows * cols;
@@ -83,7 +87,7 @@ export function simulate(grid, placements, years = 10) {
     else if (p.type === 'cool_roof') { roofDep[i] += bf[i]; roofM2 += roof[i]; }
     else { shaded[i] = 1; stops += 1; }
   }
-  const costParts = { tree: trees * TYPES.tree.cost, cool_roof: roofM2 * TYPES.cool_roof.cost, shade_stop: stops * TYPES.shade_stop.cost };
+  const costParts = { tree: trees * price.tree, cool_roof: roofM2 * price.cool_roof, shade_stop: stops * price.shade_stop };
   const cost = costParts.tree + costParts.cool_roof + costParts.shade_stop;
 
   const blockM2 = n * cellM * cellM;
@@ -153,7 +157,7 @@ export function simulate(grid, placements, years = 10) {
       roof_cool_c: TYPES.cool_roof.cool_c, cap_c: CAP, tree_co2_kg: TREE_CO2,
       hot_threshold_c: round(hot, 1), hot_percentile: HOT_PCT,
       outdoor_cells: outCount, exposed_before: exposedBefore, exposed_after: exposedAfter,
-      unit_cost: Object.fromEntries(Object.entries(TYPES).map(([t, v]) => [t, v.cost])),
+      unit_cost: Object.fromEntries(Object.entries(price).map(([t, v]) => [t, round(v)])),
       cost_parts: Object.fromEntries(Object.entries(costParts).map(([t, v]) => [t, round(v)])),
     },
     estimated: true,

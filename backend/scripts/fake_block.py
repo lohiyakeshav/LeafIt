@@ -1,6 +1,6 @@
-"""Generate the SYNTHETIC demo block (the grid logic lives in app/geodata/synthetic.py; real areas come from Earth Engine).
+"""Generate the SYNTHETIC demo block (the grid logic lives in app/domain/area/synthetic.py; real areas come from Earth Engine).
 
-Schema (same one app/geodata/area_builder.py writes):
+Schema (same one app/services/area_builder.py writes):
   grids are row-major, row 0 = north edge, col 0 = west edge, `origin` = NW corner.
   landcover codes index into `landcover_classes`.
 """
@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
-from app.geodata.synthetic import make as make_grids  # noqa: E402
+from app.domain.area.synthetic import make as make_grids  # noqa: E402
 
 
 def make(rows=60, cols=60, seed=7):

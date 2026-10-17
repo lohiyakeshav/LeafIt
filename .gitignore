@@ -1,16 +1,25 @@
-# Local only: kept on disk, never committed
+# Only what is needed to build, run and test LeafIt is committed. Everything below stays on disk, untracked.
 
-# Working docs (PRD, plan, decisions, flow, assumptions)
+# Working docs and internal notes (PRD, plan, decisions, architecture notes, per-package guides)
 docs/
+ARCHITECTURE.md
+backend/README.md
+frontend/README.md
+
+# Legacy Flutter app (superseded by the web app in frontend/)
+/app/
 
 # Python
 .venv/
 __pycache__/
 *.pyc
+.pytest_cache/
+.ruff_cache/
 
-# Runtime data written by the app
+# Runtime data written by the app (expiring caches and daily rate records)
 backend/data/plans/
 backend/data/areas/
+backend/data/fx/
 
 # Secrets: keys and service accounts never go in git
 .env
@@ -23,7 +32,6 @@ backend/data/areas/
 EarthCredentials.json
 
 # Build outputs (rebuilt from source)
-app/build/
 *.apk
 *.aab
 

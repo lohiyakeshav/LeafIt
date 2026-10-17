@@ -1,12 +1,8 @@
-"""Bill of materials, vendors and quote links (PRD §10). Pure logic: persistence lives in app/store.py."""
-import json
+"""Bill of materials, vendors and quote links (PRD §10). Pure logic: the vendor list and plans come from app/storage."""
 import math
-from pathlib import Path
 from urllib.parse import quote
 
-from .sim import Block
-
-VENDORS = json.loads((Path(__file__).parents[2] / "data/vendors.json").read_text())
+from app.domain.sim import Block
 
 BOM_ITEMS = {  # intervention -> (category, item, unit)
     "tree": ("nursery", "Native saplings (2–3 m), planting and 3 years of care", "tree"),
@@ -42,10 +38,11 @@ SEARCH_RADIUS_KM = 25
 NEAREST_FALLBACK = 3  # per category, when nothing is inside the radius
 
 
-def find_vendors(near: tuple[float, float], categories: set[str] | None, radius_km: float = SEARCH_RADIUS_KM) -> list[dict]:
+def find_vendors(vendors: list[dict], near: tuple[float, float], categories: set[str] | None,
+                 radius_km: float = SEARCH_RADIUS_KM) -> list[dict]:
     """Vendors within `radius_km` (straight line from the area's centre). A category with nobody inside the radius
     still gets its nearest few, flagged `beyond_radius`, so the user learns how far the closest supplier is."""
-    out = [{**v, "distance_km": round(km(near, (v["lat"], v["lng"])), 1), "beyond_radius": False} for v in VENDORS
+    out = [{**v, "distance_km": round(km(near, (v["lat"], v["lng"])), 1), "beyond_radius": False} for v in vendors
            if not categories or v["category"] in categories]
     inside = [v for v in out if v["distance_km"] <= radius_km]
     for cat in {v["category"] for v in out} - {v["category"] for v in inside}:

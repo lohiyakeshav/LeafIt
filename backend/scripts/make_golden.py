@@ -12,7 +12,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 from app.config import BLOCKS_DIR, ROOT  # noqa: E402
-from app.sim import Block, simulate  # noqa: E402
+from app.domain.sim import Block, simulate  # noqa: E402
 
 BLOCK_ID = "demo_lajpat"
 block = Block.load(BLOCKS_DIR / f"{BLOCK_ID}.json")

@@ -2,11 +2,10 @@
 // "Heat" view: drag the handle — left is today (Landsat), right is with the plan (heat minus the model's cooling, plus a
 // cyan glow scaled to this plan so even small effects show). "Cooling" view: only what the plan changes, in °C.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { heatColor, drawPlacements } from '../../shared/heatGrid.js';
-import { HEAT_STOPS } from '../../shared/heatGrid.js';
-import { PillToggle } from '../../shared/UI.jsx';
-import { fetchSatellite, hasMapsKey } from '../studio/diorama/satelliteTexture.js';
-import { paintGround } from '../studio/diorama/landcoverTexture.js';
+import { heatColor, drawPlacements, HEAT_STOPS } from '../../shared/heatmap/draw.js';
+import { PillToggle } from '../../shared/ui';
+import { fetchSatellite, hasMapsKey } from '../../api/mapTiles.js';
+import { paintGround } from '../../shared/heatmap/landcover.js';
 import { toGrid } from '../../model/grid.js';
 
 const W = 1200;                                   // backing-store width; displayed at 100% of the card

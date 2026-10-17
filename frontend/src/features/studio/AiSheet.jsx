@@ -1,10 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, CheckCircle, AlertCircle, ChevronDown } from 'lucide-react';
 import { endpoints } from '../../api/endpoints.js';
-import { inr } from '../../shared/format.js';
-import { Reveal, Kicker, SectionHead, Pill, PillToggle, Spinner, Bullets } from '../../shared/UI.jsx';
-import { BottomSheet } from '../../shared/MetricsBoard.jsx';
+import { inr, displayCurrency, toDisplay, fromDisplay } from '../../shared/lib/format.js';
+import { Reveal, Kicker, SectionHead, Pill, Spinner, Bullets, Dialog } from '../../shared/ui';
 
 const EXAMPLES = [
   'Keep children walking to the school cool',
@@ -21,20 +20,21 @@ const THINKING_LINES = [
   'Writing it up',
 ];
 
-export default function AiSheet({ block, years, budget, onBudget, onApply, onClose }) {
+export default function AiSheet({ block, years, budget, unitCost, onBudget, onApply, onClose }) {
   const [brief, setBrief]     = useState('');
-  const [budgetL, setBudgetL] = useState((budget / 1e5).toFixed(0));
+  // INR is typed in lakh (as Indian budgets are quoted); other currencies as a plain amount, converted to INR here
+  const { code } = displayCurrency(), lakhs = code === 'INR';
+  const [budgetL, setBudgetL] = useState(lakhs ? (budget / 1e5).toFixed(0) : String(Math.round(toDisplay(budget))));
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(null);
   const [result, setResult]   = useState(null);
 
-  const budgetVal = parseFloat(budgetL) * 1e5;
+  const budgetVal = lakhs ? parseFloat(budgetL) * 1e5 : fromDisplay(parseFloat(budgetL));
   const budgetOk  = !isNaN(budgetVal) && budgetVal >= 10_000 && budgetVal <= 1_000_000_000;
 
   async function run() {
     if (!budgetOk) return;
-    const lakh = parseFloat(budgetL);
-    onBudget?.(lakh * 1e5);
+    onBudget?.(Math.round(budgetVal));
     setLoading(true);
     setError(null);
     setResult(null);
@@ -42,8 +42,9 @@ export default function AiSheet({ block, years, budget, onBudget, onApply, onClo
       const res = await endpoints.agentPlan({
         block_id: block.id,
         brief: brief.trim() || EXAMPLES[EXAMPLES.length - 1],
-        budget_inr: lakh * 1e5,
+        budget_inr: Math.round(budgetVal),
         years,
+        unit_cost: unitCost ?? undefined,   // the planner spends the budget at the user's prices
       });
       setResult(res);
     } catch (e) {
@@ -61,7 +62,7 @@ export default function AiSheet({ block, years, budget, onBudget, onApply, onClo
   }
 
   return (
-    <BottomSheet onClose={onClose}>
+    <Dialog onClose={onClose}>
       <div style={{ padding: '0 4px' }}>
         <SectionHead
           kicker="02 — AI planner"
@@ -124,16 +125,16 @@ export default function AiSheet({ block, years, budget, onBudget, onApply, onClo
               step="1"
               style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontFamily: 'var(--font-sans)', fontSize: 18, fontWeight: 600, color: 'var(--ink)' }}
             />
-            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--muted)' }}>lakh ₹</span>
+            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--muted)' }}>{lakhs ? 'lakh ₹' : code}</span>
           </div>
           {budgetOk && (
             <div style={{ padding: '4px 4px 0', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)' }}>
-              = {inr(parseFloat(budgetL) * 1e5)} · from 0.1 to 10,000 lakh
+              = {inr(budgetVal)} · from {inr(10_000)} to {inr(1_000_000_000)}
             </div>
           )}
           {!budgetOk && (
             <div style={{ padding: '4px 4px 0', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--warn)' }}>
-              Enter a budget between ₹10,000 and ₹100 crore
+              Enter a budget between {inr(10_000)} and {inr(1_000_000_000)}
             </div>
           )}
         </div>
@@ -165,7 +166,7 @@ export default function AiSheet({ block, years, budget, onBudget, onApply, onClo
         {/* Result */}
         {result && <AiResult result={result} onApply={applyPlan} />}
       </div>
-    </BottomSheet>
+    </Dialog>
   );
 }
 

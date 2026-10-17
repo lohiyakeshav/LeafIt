@@ -5,9 +5,9 @@ import logging
 
 from google.genai import types
 
-from .gemini import MODEL, client, unverified_numbers
-from ..domain.optimise import optimise
-from ..domain.sim import Block, simulate
+from app.domain.optimise import optimise
+from app.domain.sim import Block, simulate
+from app.integrations.gemini import MODEL, client, unverified_numbers
 
 MAX_TURNS = 8
 
@@ -52,8 +52,8 @@ TOOLS = [types.Tool(function_declarations=[
 class Session:
     """Tool implementations; records every call as a visible reasoning step."""
 
-    def __init__(self, block: Block, budget: float, years: int):
-        self.block, self.budget, self.years = block, budget, years
+    def __init__(self, block: Block, budget: float, years: int, unit_cost: dict | None = None):
+        self.block, self.budget, self.years, self.unit_cost = block, budget, years, unit_cost
         self.scenarios: list[dict] = []
         self.steps: list[dict] = []
         self.chosen: str | None = None
@@ -93,8 +93,8 @@ class Session:
         budget = min(float(budget_inr or self.budget), self.budget)  # never above the user's budget
         lms = {lm["name"]: lm for lm in self.block.meta.get("landmarks", [])}
         focus = [(lms[n]["row"], lms[n]["col"]) for n in focus_landmarks if n in lms]
-        plan = optimise(self.block, budget, "hotspots" if goal == "hotspots" else "average", self.years, kinds, focus)
-        metrics = simulate(self.block, plan, self.years)["metrics"]
+        plan = optimise(self.block, budget, "hotspots" if goal == "hotspots" else "average", self.years, kinds, focus, self.unit_cost)
+        metrics = simulate(self.block, plan, self.years, self.unit_cost)["metrics"]
         sid = f"S{len(self.scenarios) + 1}"
         trees = sum(p.get("count", 1) for p in plan if p["type"] == "tree")
         roofs = sum(p["type"] == "cool_roof" for p in plan)
@@ -160,9 +160,9 @@ def _rules(s: Session, brief: str) -> str:
     return "\n".join(lines)
 
 
-def plan(block: Block, brief: str, budget: float, years: int = 10, llm=None) -> dict:
+def plan(block: Block, brief: str, budget: float, years: int = 10, llm=None, unit_cost: dict | None = None) -> dict:
     llm = llm or client()
-    s, source, text = Session(block, budget, years), "rules", ""
+    s, source, text = Session(block, budget, years, unit_cost), "rules", ""
     if llm:
         try:
             text, source = _gemini(s, brief, llm), "gemini"
@@ -170,13 +170,13 @@ def plan(block: Block, brief: str, budget: float, years: int = 10, llm=None) -> 
                 raise RuntimeError("planner ran no scenarios")
         except Exception:
             logging.exception("Gemini planner failed, using rules")
-            s, source = Session(block, budget, years), "rules"
+            s, source = Session(block, budget, years, unit_cost), "rules"
     if source == "rules":
         text = _rules(s, brief)
     chosen = next((x for x in s.scenarios if x["id"] == s.chosen),
                   max(s.scenarios, key=lambda x: x["metrics"]["temp_reduction_c"]))
     return {
-        "placements": chosen["placements"], **simulate(block, chosen["placements"], years), "chosen": chosen["id"],
+        "placements": chosen["placements"], **simulate(block, chosen["placements"], years, unit_cost), "chosen": chosen["id"],
         "scenarios": [{k: x[k] for k in ("id", "label", "metrics")} for x in s.scenarios],
         "steps": s.steps, "explanation": text, "source": source,
         "unverified_numbers": unverified_numbers(text, s.outputs, budget, years) if source == "gemini" else [],

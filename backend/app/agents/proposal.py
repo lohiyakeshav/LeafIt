@@ -2,23 +2,36 @@
 import json
 import logging
 
-from .gemini import MODEL, client, unverified_numbers
+from app.integrations.gemini import MODEL, client, unverified_numbers
 
 PROMPT = """Write a one-page funding proposal in English, in Markdown, for a neighbourhood heat-action plan.
 Audience: a municipal corporation officer or a corporate CSR committee in India.
 Sections: Title; The problem (1 short paragraph); What we will do (bullets from the bill of materials);
 Expected impact (bullets); Cost; Why this plan (cost-effectiveness); Next steps (vendors, timeline in phases, no dates).
 Use ONLY the numbers in the JSON below. Never invent figures. Say clearly that impacts are model estimates.
+If "money" is present, quote every amount of money exactly as written there (already converted), never the INR figures.
 
 JSON:
 """
 
 
+SYMBOLS = {"INR": "₹", "USD": "$", "EUR": "€", "GBP": "£", "JPY": "¥", "CNY": "CN¥", "RUB": "₽", "AED": "AED ",
+           "SAR": "SAR ", "QAR": "QAR ", "SGD": "SGD ", "AUD": "A$", "CAD": "CA$", "CHF": "CHF "}
+
+
+def money(inr_amount: float, cur: dict | None) -> str:
+    """An INR amount in the proposal's currency ({"code", "rate"} from /fx); INR when none was chosen."""
+    code, rate = (cur or {}).get("code", "INR"), (cur or {}).get("rate", 1)
+    x = inr_amount * rate
+    return f"{SYMBOLS.get(code, code + ' ')}{x:,.0f}" if abs(x) >= 100 else f"{SYMBOLS.get(code, code + ' ')}{x:,.2f}"
+
+
 def _template(ctx: dict) -> str:
     m = ctx["metrics"]
+    cur = ctx.get("currency")
     roof_line = f"\n- Painted roofs: surfaces up to {m['roof_surface_reduction_c']} °C cooler" if m.get("roof_surface_reduction_c") else ""
     items = "\n".join(f"- {i['item']}: {i['quantity']:,} {i['unit']}" for i in ctx["bill_of_materials"])
-    per = f"₹{m['cost_per_degree_inr']:,} per °C of street-level cooling" if m["cost_per_degree_inr"] else "n/a"
+    per = f"{money(m['cost_per_degree_inr'], cur)} per °C of street-level cooling" if m["cost_per_degree_inr"] else "n/a"
     return f"""# Heat-action plan: {ctx['block']}
 
 ## The problem
@@ -34,7 +47,7 @@ Dense, low-shade streets in {ctx['block']} reach high surface temperatures in su
 - Air quality: {m['aqi_change'] if abs(m['aqi_change']) >= 0.05 else 0} AQI points
 
 ## Cost
-₹{m['total_cost_inr']:,} in total ({per}).
+{money(m['total_cost_inr'], cur)} in total ({per}).{'' if not cur or cur.get('code') == 'INR' else f" Converted from INR at the {cur.get('date')} rate."}
 
 ## Next steps
 1. Approve the plan and release funds.
@@ -44,7 +57,16 @@ Dense, low-shade streets in {ctx['block']} reach high surface temperatures in su
 *All impacts are estimates from the LeafIt grid model; see "How we calculate this".*"""
 
 
+def with_money(ctx: dict) -> dict:
+    """Pre-formatted amounts in the chosen currency, so neither the template nor Gemini does currency arithmetic."""
+    m, cur = ctx["metrics"], ctx.get("currency")
+    return {**ctx, "money": {"total_cost": money(m["total_cost_inr"], cur),
+                             "cost_per_degree_c": money(m["cost_per_degree_inr"], cur) if m["cost_per_degree_inr"] else None,
+                             "unit_prices": {t: money(v, cur) for t, v in ctx.get("unit_prices_inr", {}).items()}}}
+
+
 def write(ctx: dict, llm=None) -> dict:
+    ctx = with_money(ctx)
     llm = llm or client()
     if llm:
         try:

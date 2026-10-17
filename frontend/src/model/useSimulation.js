@@ -3,12 +3,13 @@ import { toGrid } from './grid.js';
 import { simulate } from './sim.js';
 
 const EMPTY = { metrics: null, breakdown: null, cooling: null, error: null };
+const HAS_WORKER = typeof Worker !== 'undefined';
 
 /**
  * Live estimate for `placements` (cell-form) on `block`, computed in a Web Worker on every change: no debounce, no network.
  * Falls back to the main thread where workers are unavailable. Returns { metrics, breakdown, cooling (flat Float32Array), error }.
  */
-export function useSimulation(block, placements, years) {
+export function useSimulation(block, placements, years, unitCost = null) {
   const grid = useMemo(() => (block ? toGrid(block) : null), [block]);
   const [result, setResult] = useState({ grid: null, ...EMPTY });
   const workerRef = useRef(null);
@@ -16,7 +17,7 @@ export function useSimulation(block, placements, years) {
   const gridRef = useRef(null);
 
   useEffect(() => {
-    if (typeof Worker === 'undefined') return undefined;
+    if (!HAS_WORKER) return undefined;
     const worker = new Worker(new URL('./sim.worker.js', import.meta.url), { type: 'module' });
     worker.onmessage = ({ data }) => {
       if (data.seq !== seq.current) return; // an older answer arriving late
@@ -33,16 +34,20 @@ export function useSimulation(block, placements, years) {
   }, [grid]);
 
   useEffect(() => {
-    if (!grid) return;
-    const id = ++seq.current;
-    if (workerRef.current) { workerRef.current.postMessage({ type: 'run', seq: id, placements, years }); return; }
-    try {
-      const out = simulate(grid, placements, years);
-      setResult({ grid, metrics: out.metrics, breakdown: out.breakdown, cooling: out.cooling, error: null });
-    } catch (e) {
-      setResult((r) => ({ ...r, grid, error: e.message }));
-    }
-  }, [grid, placements, years]);
+    if (grid && HAS_WORKER) workerRef.current?.postMessage({ type: 'run', seq: ++seq.current, placements, years, unitCost });
+  }, [grid, placements, years, unitCost]);
 
-  return result.grid === grid ? result : EMPTY;  // numbers computed for another block are never shown
+  // No Worker (tests, very old browsers): compute on the main thread during render instead
+  const inline = useMemo(() => {
+    if (HAS_WORKER || !grid) return null;
+    try {
+      const out = simulate(grid, placements, years, unitCost);
+      return { grid, metrics: out.metrics, breakdown: out.breakdown, cooling: out.cooling, error: null };
+    } catch (e) {
+      return { ...EMPTY, grid, error: e.message };
+    }
+  }, [grid, placements, years, unitCost]);
+
+  const current = inline ?? result;
+  return current.grid === grid ? current : EMPTY;  // numbers computed for another block are never shown
 }

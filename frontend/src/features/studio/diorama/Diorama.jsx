@@ -1,8 +1,8 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef } from 'react';
 import { DioramaScene } from './DioramaScene.js';
 import { buildingsOf } from './geometry.js';
-import { paintGround } from './landcoverTexture.js';
-import { fetchSatellite, hasMapsKey } from './satelliteTexture.js';
+import { paintGround } from '../../../shared/heatmap/landcover.js';
+import { fetchSatellite, hasMapsKey } from '../../../api/mapTiles.js';
 
 /**
  * The 3D view as a React component. It owns the three.js scene's lifecycle and forwards props to it; all game rules

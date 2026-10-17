@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { MapPin, Search, X } from 'lucide-react';
-import { Spinner } from '../../shared/UI.jsx';
+import { Spinner } from '../../shared/ui';
 
 /**
  * LeafIt-styled place search on top of Places API (New) autocomplete data (Google's drop-in widget can't be themed).
@@ -19,7 +19,7 @@ export default function PlaceSearch({ google, map, onPick, autoFocus = false }) 
 
   useEffect(() => {
     const q = text.trim();
-    if (!google || q.length < 2) { setItems([]); return undefined; }
+    if (!google || q.length < 2) return undefined;   // too short: `shown` below is empty, nothing to fetch
     const id = ++seq.current;
     const t = setTimeout(async () => {
       try {
@@ -42,6 +42,8 @@ export default function PlaceSearch({ google, map, onPick, autoFocus = false }) 
     return () => clearTimeout(t);
   }, [text, google, map]);
 
+  const shown = text.trim().length >= 2 ? items : [];   // stale suggestions disappear as soon as the query is too short
+
   async function pick(s) {
     const p = s.placePrediction;
     setText(p.mainText?.text ?? p.text.text);
@@ -54,10 +56,10 @@ export default function PlaceSearch({ google, map, onPick, autoFocus = false }) 
   }
 
   function onKey(e) {
-    if (!open || !items.length) return;
-    if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => (a + 1) % items.length); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => (a - 1 + items.length) % items.length); }
-    else if (e.key === 'Enter') { e.preventDefault(); pick(items[active]); }
+    if (!open || !shown.length) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => (a + 1) % shown.length); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => (a - 1 + shown.length) % shown.length); }
+    else if (e.key === 'Enter') { e.preventDefault(); pick(shown[active]); }
     else if (e.key === 'Escape') setOpen(false);
   }
 
@@ -72,7 +74,7 @@ export default function PlaceSearch({ google, map, onPick, autoFocus = false }) 
         <input
           ref={input} value={text} autoFocus={autoFocus} placeholder="Search a neighbourhood, street or landmark"
           onChange={(e) => setText(e.target.value)} onKeyDown={onKey}
-          onFocus={() => items.length && setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)}
+          onFocus={() => shown.length && setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)}
           aria-label="Search for a place" aria-expanded={open} role="combobox"
           style={{ flex: 1, minWidth: 0, height: '100%', background: 'transparent', border: 'none', outline: 'none', fontSize: 14.5, color: 'var(--ink)' }}
         />
@@ -81,7 +83,7 @@ export default function PlaceSearch({ google, map, onPick, autoFocus = false }) 
         )}
       </div>
       <AnimatePresence>
-        {open && items.length > 0 && (
+        {open && shown.length > 0 && (
           <motion.ul
             role="listbox" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.16 }}
             style={{
@@ -90,7 +92,7 @@ export default function PlaceSearch({ google, map, onPick, autoFocus = false }) 
               boxShadow: '0 18px 40px rgba(0,0,0,0.45)',
             }}
           >
-            {items.map((s, i) => {
+            {shown.map((s, i) => {
               const p = s.placePrediction;
               return (
                 <li key={p.placeId} role="option" aria-selected={i === active}

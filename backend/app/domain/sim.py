@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 from scipy.ndimage import convolve
 
-from ..config import MODEL
+from app.config import MODEL
 
 # Every coefficient below has a source or a stated derivation; see docs/assumptions.md and GET /assumptions.
 # The numbers live in shared/model.json so the browser simulator (frontend/src/model) uses exactly the same ones.
@@ -188,8 +188,14 @@ def _validate(block: Block, placements):
                 raise ValueError(f"{where}: bus stops go on roads")
 
 
-def simulate(block: Block, placements: list[dict], years: int = 10) -> dict:
+def prices(unit_cost: dict | None = None) -> dict:
+    """₹ per unit for each type: the sourced defaults, overridden by whatever the user set."""
+    return {t: float((unit_cost or {}).get(t) or TYPES[t]["cost"]) for t in TYPES}
+
+
+def simulate(block: Block, placements: list[dict], years: int = 10, unit_cost: dict | None = None) -> dict:
     _validate(block, placements)
+    price = prices(unit_cost)
     grown = maturity(years)
     shape = block.lst.shape
 
@@ -208,8 +214,7 @@ def simulate(block: Block, placements: list[dict], years: int = 10) -> dict:
         else:
             shaded[r, c] = True
             stops += 1
-    cost_parts = {"tree": trees * TYPES["tree"]["cost"], "cool_roof": roof_m2 * TYPES["cool_roof"]["cost"],
-                  "shade_stop": stops * TYPES["shade_stop"]["cost"]}
+    cost_parts = {"tree": trees * price["tree"], "cool_roof": roof_m2 * price["cool_roof"], "shade_stop": stops * price["shade_stop"]}
     cost = sum(cost_parts.values())
 
     block_m2 = block.lst.size * block.meta["cell_m"] ** 2
@@ -259,7 +264,7 @@ def simulate(block: Block, placements: list[dict], years: int = 10) -> dict:
             "tree_co2_kg": TREE_CO2_KG_YR,
             "hot_threshold_c": round(float(hot), 1), "hot_percentile": HOT_PERCENTILE,
             "outdoor_cells": int(out.sum()), "exposed_before": int(exposed_before), "exposed_after": int(exposed_after),
-            "unit_cost": {t: TYPES[t]["cost"] for t in TYPES},
+            "unit_cost": {t: round(v) for t, v in price.items()},
             "cost_parts": {t: round(v) for t, v in cost_parts.items()},
         },
         "estimated": True,

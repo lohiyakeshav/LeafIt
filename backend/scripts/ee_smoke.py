@@ -14,8 +14,8 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
-from app.geodata import area_builder  # noqa: E402
-from app.geodata.grid import CLASSES, Bounds  # noqa: E402
+from app.domain.area.grid import CLASSES, Bounds  # noqa: E402
+from app.services import area_builder  # noqa: E402
 
 lat, lng = (float(sys.argv[1]), float(sys.argv[2])) if len(sys.argv) > 2 else (28.5704, 77.2402)
 dlat, dlng = 300 / 111_320, 300 / (111_320 * np.cos(np.radians(lat)))
@@ -30,4 +30,4 @@ for i, name in enumerate(CLASSES):
         print(f"  {name:6s} {100 * (lc == i).mean():5.1f}% of cells, mean {lst[lc == i].mean():.1f} °C")
 print(f"buildings: {len(block.get('buildings', []))}, mean footprint cover {bf.mean():.2f}, "
       f"heights {Counter(round(b['height_m']) for b in block.get('buildings', [])).most_common(4)}")
-print("conditions:", block["conditions"], "| landmarks:", [l["name"] for l in block["landmarks"]])
+print("conditions:", block["conditions"], "| landmarks:", [lm["name"] for lm in block["landmarks"]])
