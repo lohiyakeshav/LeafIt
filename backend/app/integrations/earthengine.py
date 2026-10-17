@@ -18,7 +18,9 @@ import numpy as np
 from scipy.ndimage import gaussian_filter
 
 from app import config
+from app.config import MODEL
 from app.domain.area.buildings import parse_features
+from app.domain.area.climate import hot_months  # noqa: F401 - re-exported: the season used for the heat baseline
 from app.domain.area.grid import Bounds, Grid, make_grid
 
 log = logging.getLogger("leafit.ee")
@@ -26,6 +28,11 @@ log = logging.getLogger("leafit.ee")
 CONFIDENCE_MIN = 0.75
 TILE_M = 500        # buildings are queried in ~500 m tiles: one query may not return more than 5000 features
 HEIGHT_CELL_M = 4   # Open Buildings 2.5D Temporal is a 4 m raster
+RING_CELLS = round(MODEL["ring_m"] / MODEL["area"]["cell_m"])   # the ring of surroundings, in cells (150 m → 15)
+CANOPY_SUBSAMPLE = 4        # canopy height is sampled 4 × 4 per cell (2.5 m) and averaged back into 10 m cells
+CANOPY_ASSET = "projects/sat-io/open-datasets/facebook/meta-canopy-height"   # Meta/WRI 1 m canopy height (2009-2020, mostly 2018-20)
+WORLDPOP_ASSET = "WorldPop/GP/100m/pop_age_sex"
+VULNERABLE_BANDS = ["M_0", "M_1", "F_0", "F_1", "M_65", "M_70", "M_75", "M_80", "F_65", "F_70", "F_75", "F_80"]   # under 5 and 65+
 _init_lock, _ready = threading.Lock(), False
 
 
@@ -53,19 +60,20 @@ def _init():
         _ready = True
 
 
-def hot_months(lat: float) -> tuple[int, int]:
-    """Months (inclusive, may wrap the year) used for the 'hot season' baseline."""
-    if lat < 0:
-        return (12, 2)
-    return (4, 6) if lat < 35 else (6, 8)
-
-
 def fetch_layers(bounds: Bounds, grid: Grid) -> dict:
-    """-> {"lst": rows×cols °C, "worldcover": rows×cols codes, "features": [...], "height_at": f(lat, lng), "lst_period": str}"""
+    """Everything satellite-derived for an area and the 150 m ring around it.
+
+    -> {"lst", "worldcover": area rows×cols, "ring": {"pad", "lst", "worldcover", "canopy_fine"|None},
+        "pop": {...}|None, "features", "height_at", "lst_period"}
+    Heat, land cover and buildings are required (failure raises EEUnavailable). Canopy height and population are optional:
+    if they fail, the area still builds and says so (`canopy_fine` / `pop` are None).
+    """
     _init()
     import ee
+    pad = RING_CELLS
+    ring_grid = grid.padded(pad)
     try:
-        region = ee.Geometry.Rectangle([grid.west, grid.south, grid.east, grid.north])
+        region = ee.Geometry.Rectangle([ring_grid.west, ring_grid.south, ring_grid.east, ring_grid.north])
         months = hot_months(bounds.center[0])
         this_year = date.today().year
 
@@ -83,13 +91,16 @@ def fetch_layers(bounds: Bounds, grid: Grid) -> dict:
         wc = ee.ImageCollection("ESA/WorldCover/v200").first().select("Map").rename("wc")
         stack = ee.Image.cat([lst.rename("lst").toFloat(), wc.toFloat()])
 
-        with ThreadPoolExecutor(max_workers=6) as pool:
-            f_pixels = pool.submit(_pixels, stack, grid)
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            f_pixels = pool.submit(_pixels, stack, ring_grid)
             f_height = pool.submit(_height_raster, bounds)
             f_feats = [pool.submit(_building_tile, t) for t in _tiles(bounds)]
+            f_canopy = pool.submit(_optional, _canopy_fine, ring_grid, "canopy height")
+            f_pop = pool.submit(_optional, _population, grid, "population")
             px = f_pixels.result()
             height_grid, height = f_height.result()
             features = [f for fut in f_feats for f in fut.result()]
+            canopy_fine, pop = f_canopy.result(), f_pop.result()
     except EEUnavailable:
         raise
     except Exception as e:  # noqa: BLE001
@@ -100,9 +111,53 @@ def fetch_layers(bounds: Bounds, grid: Grid) -> dict:
         cell = height_grid.cell_of(lat, lng)
         return float(height[cell]) if cell and np.isfinite(height[cell]) and height[cell] > 0 else None
 
-    return {"lst": fill_gaps(px["lst"]), "worldcover": np.nan_to_num(px["wc"], nan=0).astype(int),
-            "features": features, "height_at": height_at,
+    crop = lambda a: a[pad:pad + grid.rows, pad:pad + grid.cols]  # noqa: E731
+    ring_lst = fill_gaps(px["lst"])   # filled over the whole ring, so gaps at the edge borrow from outside the box
+    wc_ring = np.nan_to_num(px["wc"], nan=0).astype(int)
+    return {"lst": crop(ring_lst), "worldcover": crop(wc_ring),
+            "ring": {"pad": pad, "lst": ring_lst, "worldcover": wc_ring, "canopy_fine": canopy_fine},
+            "pop": pop, "features": features, "height_at": height_at,
             "lst_period": f"{this_year - 3}-{this_year - 1}, months {months[0]}-{months[1]}"}
+
+
+def _optional(fn, arg, what: str):
+    """Run an optional layer fetch; any failure is logged and becomes None (the area builds without it)."""
+    try:
+        return fn(arg)
+    except Exception as e:  # noqa: BLE001
+        log.warning("%s unavailable, building without it: %s", what, e)
+        return None
+
+
+def _canopy_fine(ring_grid: Grid):
+    """Canopy height (m) over the ring grid sampled CANOPY_SUBSAMPLE × finer; NaN where the tiles have no data."""
+    import ee
+    region = ee.Geometry.Rectangle([ring_grid.west, ring_grid.south, ring_grid.east, ring_grid.north])
+    img = ee.ImageCollection(CANOPY_ASSET).filterBounds(region).mosaic().select([0]).rename("h").toFloat().unmask(-1)  # select by index: never hardcode the band
+    h = _pixels(img, ring_grid.refined(CANOPY_SUBSAMPLE))["h"]
+    return np.where(h < 0, np.nan, h)
+
+
+def _population(grid: Grid):
+    """WorldPop people and vulnerable people (under 5, 65+) per native ~93 m pixel covering the area.
+
+    -> {"people", "vulnerable": 2-D arrays, "x0", "y0": north-west corner of the pixel block (degrees), "d": pixel size (degrees)}
+    """
+    import ee
+    region = ee.Geometry.Rectangle([grid.west, grid.south, grid.east, grid.north])
+    col = ee.ImageCollection(WORLDPOP_ASSET).filterBounds(region)
+    year = col.aggregate_max("year")
+    col = col.filter(ee.Filter.eq("year", year))
+    d, _, x_origin, _, _, y_origin = col.first().select("population").projection().getInfo()["transform"]
+    d = abs(d)
+    i0, i1 = math.floor((grid.west - x_origin) / d), math.floor((grid.east - x_origin) / d)   # snap to the dataset's own pixel grid
+    j0, j1 = math.floor((y_origin - grid.north) / d), math.floor((y_origin - grid.south) / d)
+    pix = Grid(j1 - j0 + 1, i1 - i0 + 1, 0.0, y_origin - j0 * d, x_origin + i0 * d, d, d)
+    mosaic = col.mosaic()
+    img = ee.Image.cat([mosaic.select("population").rename("people"),
+                        mosaic.select(VULNERABLE_BANDS).reduce(ee.Reducer.sum()).rename("vulnerable")]).toFloat().unmask(0)
+    px = _pixels(img, pix)
+    return {"people": np.nan_to_num(px["people"]), "vulnerable": np.nan_to_num(px["vulnerable"]), "x0": pix.west, "y0": pix.north, "d": d}
 
 
 def _pixels(image, grid: Grid) -> dict:

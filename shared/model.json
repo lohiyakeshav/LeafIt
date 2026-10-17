@@ -1,21 +1,99 @@
 {
-  "version": 1,
+  "version": 2,
   "types": {
-    "tree":       {"cost": 3000,    "cool_c": 0.35, "sigma": 1.5},
-    "cool_roof":  {"cost": 250,     "cool_c": 0.5,  "sigma": 1.0},
-    "shade_stop": {"cost": 1000000, "cool_c": 0.0,  "sigma": 0}
+    "tree": {
+      "cost": 3000,
+      "cool_c": 0.35,
+      "sigma": 1.5
+    },
+    "cool_roof": {
+      "cost": 250,
+      "cool_c": 0.5,
+      "sigma": 1.0
+    },
+    "shade_stop": {
+      "cost": 1000000,
+      "cool_c": 0.0,
+      "sigma": 0
+    }
   },
   "cooling_cap_c": 3.0,
-  "roof": {"albedo_gain": 0.35, "sun_w_m2": 800, "heat_transfer_w_m2k": 30},
-  "tree": {"co2_kg_yr": 21.8, "growth_tau_years": 12, "canopy_m2": 50},
-  "air_quality": {"nowak_gain": 0.0024, "nowak_canopy": 0.48},
+  "roof": {
+    "indoor_c_range": [1.3, 2.0],
+    "indoor_note": "Rooms below a cool roof, measured in Kerala and Hyderabad pilots (NRDC). Context only: not simulated.",
+    "albedo_gain": 0.35,
+    "sun_w_m2": 800,
+    "heat_transfer_w_m2k": 30
+  },
+  "tree": {
+    "co2_kg_yr": 21.8,
+    "growth_tau_years": 12,
+    "canopy_m2": 50
+  },
+  "air_quality": {
+    "nowak_gain": 0.0024,
+    "nowak_canopy": 0.48
+  },
   "landmark_radius_cells": 5,
   "hot_percentile": 75,
   "outdoor_building_frac_below": 0.5,
   "placement_rules": {
-    "tree":       {"max_count_per_cell": 10, "blocked_building_frac_from": 0.8, "blocked_landcover": ["water"]},
-    "cool_roof":  {"requires_roof": true, "unique_per_cell": true},
-    "shade_stop": {"allowed_landcover": ["road"], "unique_per_cell": true}
+    "tree": {
+      "max_count_per_cell": 10,
+      "blocked_building_frac_from": 0.8,
+      "blocked_landcover": [
+        "water"
+      ]
+    },
+    "cool_roof": {
+      "requires_roof": true,
+      "unique_per_cell": true
+    },
+    "shade_stop": {
+      "allowed_landcover": [
+        "road"
+      ],
+      "unique_per_cell": true
+    }
   },
-  "area": {"cell_m": 10, "min_side_m": 200, "max_side_m": 1500, "max_km2": 1.0, "tolerance": 0.02}
+  "area": {
+    "cell_m": 10,
+    "min_side_m": 200,
+    "max_side_m": 1500,
+    "max_km2": 1.0,
+    "tolerance": 0.02
+  },
+  "canopy": {
+    "crown_ref_m2": 50,
+    "min_height_m": 2,
+    "full_height_m": 8,
+    "plantable_max_canopy": 0.6
+  },
+  "carriageway_block_from": 0.5,
+  "air": {
+    "cap_c": 1.5,
+    "per_tree_c": 0.12,
+    "sigma": 2.0
+  },
+  "ring_m": 150,
+  "humid": {
+    "max_window_canopy": 0.5,
+    "window_cells": 3
+  },
+  "climate_classes": {
+    "hot_dry_below_rh_pct": 45,
+    "humid_above_rh_pct": 65
+  },
+  "carriageway_width_m": {
+    "motorway": 16,
+    "trunk": 16,
+    "primary": 14,
+    "secondary": 10.5,
+    "tertiary": 7.5,
+    "residential": 5.5,
+    "unclassified": 5.5,
+    "living_street": 5.5,
+    "service": 4
+  },
+  "lane_width_m": 3.5
 }

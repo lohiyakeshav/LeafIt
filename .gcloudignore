@@ -14,3 +14,6 @@ EarthCredentials.json
 **/.env.*
 frontend/node_modules
 frontend/dist
+
+# Vertex AI service-account key (any name containing "vertex")
+*[Vv]ertex*.json

@@ -170,7 +170,7 @@ export default function ExplorePage() {
     try {
       fetchSatellite(b).catch(() => {});        // warm the browser's tile cache while the server works
       const { id, cached } = await endpoints.createArea(b, place?.name || 'Selected area');
-      if (!cached) forgetBlock(id);             // a fresh build may replace an earlier stand-in that this tab already loaded
+      if (!cached) forgetBlock(id);             // a fresh build (e.g. now with OpenStreetMap roads) replaces what this tab loaded earlier
       navigate(`/area/${id}`);
     } catch (e) {
       setError(e.message);

@@ -2,13 +2,15 @@
 import json
 import logging
 
-from app.integrations.gemini import MODEL, client, unverified_numbers
+from app.integrations.gemini import MODEL, client, generate, unverified_numbers
 
 PROMPT = """Write a one-page funding proposal in English, in Markdown, for a neighbourhood heat-action plan.
 Audience: a municipal corporation officer or a corporate CSR committee in India.
 Sections: Title; The problem (1 short paragraph); What we will do (bullets from the bill of materials);
 Expected impact (bullets); Cost; Why this plan (cost-effectiveness); Next steps (vendors, timeline in phases, no dates).
 Use ONLY the numbers in the JSON below. Never invent figures. Say clearly that impacts are model estimates.
+If "place" is present use it: say what the area is like (climate, existing tree cover), name the tree species chosen when the bill of
+materials lists them, and when residents are given say who benefits (and equity_cooling_c if present: cooling where vulnerable people live).
 If "money" is present, quote every amount of money exactly as written there (already converted), never the INR figures.
 
 JSON:
@@ -71,7 +73,7 @@ def write(ctx: dict, llm=None) -> dict:
     if llm:
         try:
             prompt = PROMPT + json.dumps(ctx, ensure_ascii=False)
-            text = llm.models.generate_content(model=MODEL, contents=prompt).text.strip()
+            text = generate(llm, model=MODEL, contents=prompt).text.strip()
             return {"text": text, "source": "gemini", "unverified_numbers": unverified_numbers(text, ctx)}
         except Exception:
             logging.exception("Gemini proposal failed, using template")

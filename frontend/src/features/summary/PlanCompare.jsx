@@ -50,7 +50,7 @@ export default function PlanCompare({ block, placements, cooling, years, maxMapH
   useEffect(() => {
     let alive = true;
     const painted = () => alive && setPhoto({ canvas: paintGround(toGrid(block)), painted: true });
-    if (!block.synthetic && block.bounds && hasMapsKey()) fetchSatellite(block.bounds).then((p) => alive && setPhoto(p)).catch(painted);
+    if (block.bounds && hasMapsKey()) fetchSatellite(block.bounds).then((p) => alive && setPhoto(p)).catch(painted);
     else painted();
     return () => { alive = false; };
   }, [block]);
@@ -156,7 +156,7 @@ export default function PlanCompare({ block, placements, cooling, years, maxMapH
         </span>
       </div>
       <figcaption style={{ marginTop: 8, fontFamily: 'var(--font-mono)', fontSize: 10.5, lineHeight: 1.6, color: 'var(--muted)' }}>
-        Heat: {block.synthetic ? 'synthetic stand-in, not measured' : `Landsat 8/9 surface temperature, hot-season median${block.lst_period ? ` (${block.lst_period})` : ''}`}
+        Heat: Landsat 8/9 surface temperature, hot-season median{block.lst_period ? ` (${block.lst_period})` : ''}
         {' '}· Cooling: LeafIt model estimate · {photo?.painted ? 'Painted land-cover map' : photo?.copyright ?? 'Loading photo…'}
       </figcaption>
     </figure>

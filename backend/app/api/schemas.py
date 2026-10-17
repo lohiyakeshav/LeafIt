@@ -12,6 +12,7 @@ class Placement(BaseModel):
     col: int
     count: int = 1
     building_id: str | None = None  # set by the 3D view for roofs; the model itself works on cells
+    species: str | None = Field(None, max_length=40)   # trees: a catalogue id (shared/species.json); none = the generic tree
 
 
 class UnitCost(BaseModel):

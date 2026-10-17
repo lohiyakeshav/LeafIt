@@ -53,7 +53,7 @@ export function cellsForPolygon(poly, { rows, cols, cellM, bf }) {
 
 /**
  * [{id, height, poly:[[x,z]...], cells}] for a block. Real areas carry footprints + heights from the backend;
- * the synthetic demo block has only a coverage grid, so each roofed cell becomes a box (deterministic, so it never "jumps").
+ * a block without footprints (only a coverage grid) gets a box per roofed cell (deterministic, so it never "jumps").
  */
 export function buildingsOf(block, grid) {
   const { rows, cols, cellM } = grid;

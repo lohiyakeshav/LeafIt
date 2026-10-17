@@ -77,3 +77,19 @@ def coverage(buildings: list[dict], grid: Grid) -> np.ndarray:
         gx, gz = np.meshgrid(np.arange(x0, x1) + 0.5, np.arange(z0, z1) + 0.5)
         hi[z0:z1, x0:x1] |= _inside(gx, gz, poly)  # OR: overlapping footprints don't count twice
     return hi.reshape(grid.rows, ss, grid.cols, ss).mean(axis=(1, 3))
+
+
+def floor_area(buildings: list[dict], grid: Grid, storey_m: float = 3.0) -> np.ndarray:
+    """Building floor area (m²) per cell: footprint × storeys (height ÷ 3 m), the weight people are shared out by."""
+    ss = SUPERSAMPLE
+    step = grid.cell_m / ss
+    hi = np.zeros((grid.rows * ss, grid.cols * ss))
+    for b in buildings:
+        poly = np.asarray(b["poly"], dtype=float) / step
+        x0, z0 = np.maximum(np.floor(poly.min(axis=0)).astype(int), 0)
+        x1, z1 = np.minimum(np.ceil(poly.max(axis=0)).astype(int), [hi.shape[1], hi.shape[0]])
+        if x1 <= x0 or z1 <= z0:
+            continue
+        gx, gz = np.meshgrid(np.arange(x0, x1) + 0.5, np.arange(z0, z1) + 0.5)
+        hi[z0:z1, x0:x1] += _inside(gx, gz, poly) * max(1.0, b["height_m"] / storey_m)
+    return hi.reshape(grid.rows, ss, grid.cols, ss).sum(axis=(1, 3)) * step * step

@@ -19,22 +19,43 @@ export function MetricWhyModal({ metricKey, metrics: m, breakdown: b, onClose })
     cooling: {
       title: 'Cooling', accent: 'Cooling',
       what: 'How much cooler it gets where people are: averaged over the streets, parks and open ground of the block (10 m cells).',
-      rule: `Each tree cools its own cell by up to ${nb('tree_cool_c')} °C when fully grown, fading out over about ${nb('tree_reach_m')} m. A cool roof makes the roof itself about ${nb('roof_surface_c')} °C cooler. Trees grow into their effect: about 34% by year 5, 57% by year 10 and 81% by year 20.`,
+      rule: `Each tree cools its own cell by up to ${nb('tree_cool_c')} °C when fully grown (bigger-crowned species more, smaller less), fading out over about ${nb('tree_reach_m')} m. Trees already in or around the block (up to 150 m out) are counted first, so new trees add less where shade exists. A cool roof makes the roof itself about ${nb('roof_surface_c')} °C cooler. Trees grow into their effect: a typical tree reaches about 34% by year 5, 57% by year 10 and 81% by year 20; fast-growing species get there sooner, slow ones later.`,
+      rows: [
+        ['Trees · cool roofs', `${trees} · ${roof > 0 ? `${roof} m²` : '0'}`],
+        ['Typical tree’s growth (year)', matPct],
+        ['Most-cooled street spot', `${Math.abs(nm('peak_reduction_c')) >= 0.005 ? '−' : ''}${Math.abs(nm('peak_reduction_c')).toFixed(2)}°`],
+        ['Street cooling, average', `${Math.abs(nm('temp_reduction_c')) >= 0.0005 ? '−' : ''}${Math.abs(nm('temp_reduction_c')).toFixed(3)}°`],
+      ],
+    },
+    air: {
+      title: 'Air cooling', accent: 'Air',
+      what: 'How much cooler the air itself gets at head height. This is smaller than the surface figure: air mixes, so only dense canopy moves it much.',
+      rule: 'A second, flatter curve with a ceiling of about 1.5 °C (the cooling measured under dense urban canopy in the literature). A line of street trees about 8 m apart lands at roughly 0.4 to 0.8 °C along that street. This is an estimate, not a measurement. Trees already standing in or beside the block count first, so new trees add less where shade already exists.',
       rows: [
         ['Trees · cool roofs', `${trees} · ${roof > 0 ? `${roof} m²` : '0'}`],
         ['Tree growth (year)', matPct],
-        ['Most-cooled street spot', `${Math.abs(nm('peak_reduction_c')) >= 0.005 ? '−' : ''}${Math.abs(nm('peak_reduction_c')).toFixed(2)}°`],
+        ['Air cooling, average', `${Math.abs(nm('air_reduction_c')) >= 0.0005 ? '−' : ''}${Math.abs(nm('air_reduction_c')).toFixed(3)}°`],
+      ],
+    },
+    equity: {
+      title: 'For vulnerable residents', accent: 'vulnerable',
+      what: 'The average cooling in the most heat-exposed quarter of the block: the places with the most children under 5 and adults over 65 nearby.',
+      rule: 'People come from WorldPop (100 m), split onto buildings by floor area, so the pattern is an estimate. Exposure is smoothed over about 100 m. If this number is well below the street average, the plan is cooling places where fewer vulnerable people live.',
+      rows: [
         ['Street cooling, average', `${Math.abs(nm('temp_reduction_c')) >= 0.0005 ? '−' : ''}${Math.abs(nm('temp_reduction_c')).toFixed(3)}°`],
+        ['Most exposed quarter', m?.equity_cooling_c == null ? 'no data' : `${Math.abs(nm('equity_cooling_c')) >= 0.0005 ? '−' : ''}${Math.abs(nm('equity_cooling_c')).toFixed(3)}°`],
       ],
     },
     aqi: {
       title: 'Air quality', accent: 'Air',
       what: "The change in the block's air-quality index from leaves trapping fine dust (PM2.5). Negative is better.",
-      rule: `Trees clean air, but slowly. We scale the best-case canopy improvement to your plan, counting ${nb('canopy_m2_per_tree')} m² of crown per grown tree.`,
+      rule: b?.baseline_aqi == null
+        ? 'There is no air-quality reading for this area, so no AQI change is claimed.'
+        : 'Trees clean air, but slowly. We scale the best-case canopy improvement to your plan, counting each species’ grown crown (about 20 to 110 m² by size class).',
       rows: [
-        ['Trees × growth', `${trees} × ${matPct}`],
+        ['Trees', `${trees}`],
         ['Canopy added', `${nb('added_canopy_pct')}%`],
-        ['AQI change', `${Math.abs(nm('aqi_change')).toFixed(2)}`],
+        ['AQI change', b?.baseline_aqi == null ? 'no reading' : `${Math.abs(nm('aqi_change')).toFixed(2)}`],
       ],
     },
     co2: {

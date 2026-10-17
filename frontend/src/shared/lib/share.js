@@ -3,7 +3,7 @@
 
 const pack = (items) => items.map((it) => (it.type === 'cool_roof'
   ? ['r', it.buildingId ?? null, it.cells]
-  : [it.type === 'tree' ? 't' : 's', Math.round(it.x * 10) / 10, Math.round(it.z * 10) / 10]));
+  : [it.type === 'tree' ? 't' : 's', Math.round(it.x * 10) / 10, Math.round(it.z * 10) / 10, ...(it.species ? [it.species] : [])]));
 
 async function pipe(bytes, stream) {
   return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
@@ -19,7 +19,7 @@ export async function encodePlan(items, years) {
   return btoa(out).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-/** URL string -> { years, packed: [['t'|'s', x, z] | ['r', buildingId, cells]] } or null if it isn't a valid plan */
+/** URL string -> { years, packed: [['t'|'s', x, z, species?] | ['r', buildingId, cells]] } or null if it isn't a valid plan */
 export async function decodePlan(s) {
   try {
     const json = await pipe(fromB64url(s), new DecompressionStream('deflate-raw'));

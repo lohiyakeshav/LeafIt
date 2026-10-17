@@ -42,9 +42,9 @@ export function ImpactPanel({ metrics: m, breakdown: b, budget, years, busy, com
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <div {...tap('aqi')}>
           <InfoLabel label="AIR QUALITY" onInfo={() => onInfo?.('aqi')} />
-          <AnimatedNumber value={aqi} format={v => Math.abs(v) < 0.005 ? '0.00' : `−${Math.abs(v).toFixed(2)}`}
+          <AnimatedNumber value={aqi} format={v => b?.baseline_aqi == null ? '—' : Math.abs(v) < 0.005 ? '0.00' : `−${Math.abs(v).toFixed(2)}`}
             style={{ ...NUM, display: 'block', marginTop: 8, fontSize: compact ? 26 : 32, letterSpacing: '-0.04em', color: aqi < -0.005 ? 'var(--accent)' : 'var(--ink)' }} />
-          <div style={{ marginTop: 6, fontSize: 12.5, color: 'var(--muted)' }}>AQI points</div>
+          <div style={{ marginTop: 6, fontSize: 12.5, color: 'var(--muted)' }}>{b?.baseline_aqi == null ? 'no AQI reading for this area' : 'AQI points'}</div>
         </div>
         <div {...tap('co2')}>
           <InfoLabel label="CO₂ CAPTURED" onInfo={() => onInfo?.('co2')} />
@@ -58,6 +58,8 @@ export function ImpactPanel({ metrics: m, breakdown: b, budget, years, busy, com
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, paddingTop: 20, borderTop: '1px solid var(--rule)' }}>
         {[
           ['exposure', 'STILL TOO HOT', `${Math.round(n(m, 'heat_exposure_pct'))}% of outdoors`],
+          ['air', 'AIR COOLING', `${deg(n(m, 'air_reduction_c'))} at head height`],
+          ['equity', 'FOR VULNERABLE RESIDENTS', m?.equity_cooling_c == null ? 'no population data' : `${deg(n(m, 'equity_cooling_c'))} in the most exposed areas`],
           ['per_degree', 'COST PER °C', m?.cost_per_degree_inr == null ? '—' : inr(n(m, 'cost_per_degree_inr'))],
         ].map(([key, label, val]) => (
           <div key={key} {...tap(key)}>

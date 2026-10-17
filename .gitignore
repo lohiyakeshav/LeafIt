@@ -40,3 +40,7 @@ EarthCredentials.json
 .vscode/
 .idea/
 *.iml
+
+# Vertex AI service-account key (any name containing "vertex")
+*[Vv]ertex*.json
+backend/data/eval_areas/

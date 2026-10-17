@@ -75,6 +75,7 @@ export default function HomePage() {
           <Reveal delay={0.65}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
               <Pill label="Find your place" icon={MapPin} onClick={() => navigate('/explore')} />
+              <Pill label="Open Lajpat Nagar market" kind="outline" onClick={() => navigate('/block/lajpat_nagar')} />
               <button onClick={() => navigate('/assumptions')} style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--accent)', padding: '8px 0' }}>METHOD & ASSUMPTIONS →</button>
             </div>
           </Reveal>

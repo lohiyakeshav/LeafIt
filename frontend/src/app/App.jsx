@@ -23,6 +23,7 @@ export default function App() {
             <Route path="/area/:id" element={<StudioPage />} />
             <Route path="/block/:id" element={<StudioPage />} />
             <Route path="/simulator/:id" element={<OldSimulatorLink />} />
+            <Route path="/block/demo_lajpat" element={<Navigate to="/block/lajpat_nagar" replace />} />
             <Route path="/summary" element={<SummaryPage />} />
             <Route path="/vendors" element={<VendorsPage />} />
             <Route path="/assumptions" element={<AssumptionsPage />} />

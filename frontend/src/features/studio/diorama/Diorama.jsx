@@ -23,6 +23,7 @@ const Diorama = forwardRef(function Diorama({
   useImperativeHandle(ref, () => ({
     ripple: (x, z) => scene.current?.ripple(x, z),
     resetView: () => scene.current?.resetView(),
+    highlightZone: (z) => scene.current?.highlightZone(z),
     setAzimuth: (a) => scene.current?.setAzimuth(a),
     get drawCalls() { return scene.current?.drawCalls ?? 0; },
   }), []);
@@ -57,14 +58,14 @@ const Diorama = forwardRef(function Diorama({
     let alive = true;
     const abort = new AbortController();
     const b = block.bounds;
-    if (!block.synthetic && b && hasMapsKey()) {
+    if (b && hasMapsKey()) {
       fetchSatellite(b, { signal: abort.signal }).then(({ canvas, copyright }) => {
         if (!alive) return;
         s.setGroundImage(canvas, { satellite: true });
         latest.current.onSatellite?.({ ok: true, copyright });
       }).catch((e) => alive && latest.current.onSatellite?.({ ok: false, error: e.message }));
     } else {
-      latest.current.onSatellite?.({ ok: false, error: block.synthetic ? 'synthetic' : 'no-key' });
+      latest.current.onSatellite?.({ ok: false, error: 'no-key' });
     }
     return () => { alive = false; abort.abort(); };
   }, [block, grid, buildings]);

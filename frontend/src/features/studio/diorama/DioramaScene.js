@@ -10,7 +10,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { heatColor } from '../../../shared/heatmap/draw.js';
-import { maturity } from '../../../model/rules.js';
+import { crownRatio, speciesMaturity, speciesOf } from '../../../model/rules.js';
+import { zoneBounds } from '../../../model/zones.js';
 import { buildIndex, groundHit, pickBuilding } from './geometry.js';
 import { makeTreeAtlas, TREE_VARIANTS } from './sprites.js';
 
@@ -419,6 +420,9 @@ export class DioramaScene {
     const ring = new THREE.Mesh(new THREE.RingGeometry(1.7, 2.3, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x9ee35f, transparent: true, opacity: 0.95, depthTest: false }));
     ring.renderOrder = 10; ring.visible = false;
     this.cursor = ring; this._add(ring);
+    const zone = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x9ee35f, transparent: true, opacity: 0.28, depthTest: false }));
+    zone.renderOrder = 8; zone.visible = false;
+    this.zoneMark = zone; this._add(zone);
     this.rippleMeshes = [];
     for (let i = 0; i < 8; i++) {
       const m = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x7fd6ff, transparent: true, opacity: 0, depthTest: false }));
@@ -432,14 +436,14 @@ export class DioramaScene {
     if (!this.trees) return;
     // Props are exaggerated as the area gets bigger (a 9 m tree is a speck over 600 m), the way a diorama makes small things legible.
     const ex = clamp((this.radius ?? 100) / 100, 1.4, 2.6);
-    const grown = (0.4 + 0.6 * maturity(years)) * ex;
     const m = new THREE.Matrix4(), q = new THREE.Quaternion();
     let nt = 0, ns = 0;
     const coatedIds = new Set(), coatedCells = new Set();   // tapped roofs carry their building id; AI plans only have cells
     this.pickables = [];                       // trees and stops, for screen-space erase picking
     for (const it of items) {
       if (it.type === 'tree' && nt < MAX_ITEMS) {
-        const s = grown * (0.9 + 0.2 * hashf(idHash(it.id)));
+        const sp = speciesOf(it.species);
+        const s = ex * (0.4 + 0.6 * speciesMaturity(sp, years)) * clamp(Math.sqrt(crownRatio(sp)), 0.7, 1.35) * (0.9 + 0.2 * hashf(idHash(it.id)));
         m.compose(new THREE.Vector3(it.x, 0.05, it.z), q, new THREE.Vector3(s, s, s));
         this.trees.mesh.setMatrixAt(nt, m);
         m.compose(new THREE.Vector3(it.x + 0.8, 0.04, it.z + 0.6), q, new THREE.Vector3(s * 3.4, 1, s * 2));
@@ -508,6 +512,19 @@ export class DioramaScene {
       this.cursor.position.set(g.x, 0.3, g.z);
       this.cursor.material.color.setHex(this.tool === 'erase' ? 0xffb454 : g.valid ? 0x9ee35f : 0xff6b5a);
     }
+    this.requestRender();
+  }
+
+  /** Tint one of the nine named zones for a moment, so a plan's "where and why" can be pointed at on the map. */
+  highlightZone(name, ms = 2200) {
+    const b = zoneBounds(this.grid.rows, this.grid.cols)[name];
+    if (!b || !this.zoneMark) return;
+    const m = this.grid.cellM, [r0, r1, c0, c1] = b;
+    this.zoneMark.position.set(((c0 + c1) / 2) * m, 0.4, ((r0 + r1) / 2) * m);
+    this.zoneMark.scale.set((c1 - c0) * m, 1, (r1 - r0) * m);
+    this.zoneMark.visible = true;
+    clearTimeout(this._zoneTimer);
+    this._zoneTimer = setTimeout(() => { this.zoneMark.visible = false; this.requestRender(); }, ms);
     this.requestRender();
   }
 
@@ -689,6 +706,7 @@ export class DioramaScene {
 
   dispose() {
     this._disposed = true;
+    clearTimeout(this._zoneTimer);
     cancelAnimationFrame(this._raf);
     this._ro.disconnect();
     this.controls.dispose();

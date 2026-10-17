@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "default": "generic",
+  "note": "Crown and spacing figures are PLANNING ESTIMATES by size class: no published urban crown-spread values were found for these species (Delhi Forest Department's list names species only; IISc ETR-79 gives heights). Confirm with your local forest department before planting.",
+  "size_classes": {
+    "small":  {"crown_m": 5,  "spacing_m": 4.5, "status": "estimate"},
+    "medium": {"crown_m": 8,  "spacing_m": 6,   "status": "estimate"},
+    "large":  {"crown_m": 12, "spacing_m": 9,   "status": "estimate"}
+  },
+  "growth_tau_years": {"fast": 8, "medium": 12, "slow": 16},
+  "pit_m2": 4,
+  "pit_note": "Minimum free ground per tree: a 1.5 m wide pit (Global Designing Cities) plus room for roots, rounded to 4 m².",
+  "sources": {
+    "delhi": {"title": "Delhi Forest Department: list of common indigenous tree species of Delhi (verified, 78 species)", "url": "https://forest.delhi.gov.in/sites/default/files/generic_multiple_files/common-indigenous-species-in-delhi-2.pdf"},
+    "iisc": {"title": "IISc ENVIS Technical Report 79: avenue trees of Bengaluru", "url": "https://wgbis.ces.iisc.ac.in/energy/water/paper/ETR79/description.html"},
+    "bbmp": {"title": "BBMP street-tree shortlist (pongamia among eight crown-limited species), news report", "url": "https://wgbis.ces.iisc.ac.in/sdss/BUiS/usefulLinks/CES_TVR_ETR_79_Avenue_trees.pdf"},
+    "nursery": {"title": "Ugaoo nursery guide: height ranges (commercial source, lower reliability)", "url": "https://www.ugaoo.com/knowledge-center/fast-growing-trees-for-shade-in-india/"}
+  },
+  "species": [
+    {"id": "generic", "common": "Mixed native street tree", "scientific": "", "size_class": "medium", "growth": "medium",
+     "climates": ["hot_dry", "composite", "humid"], "listed_in": [], "status": "default",
+     "note": "The model's baseline tree (8 m crown, effect grows with τ = 12 years). Used when no species is chosen."},
+    {"id": "neem", "common": "Neem", "scientific": "Azadirachta indica", "size_class": "medium", "growth": "medium",
+     "climates": ["hot_dry", "composite", "humid"], "listed_in": ["delhi"], "status": "estimate",
+     "note": "Widely planted; height about 13-16 m (nursery source). Size class and humid suitability are estimates."},
+    {"id": "arjun", "common": "Arjun", "scientific": "Terminalia arjuna", "size_class": "large", "growth": "medium",
+     "climates": ["hot_dry", "composite"], "listed_in": ["delhi"], "status": "estimate",
+     "note": "Tall roadside tree, about 20-25 m (nursery source). Prefers moisture near water; humid suitability not established."},
+    {"id": "jamun", "common": "Jamun", "scientific": "Syzygium cumini", "size_class": "large", "growth": "slow",
+     "climates": ["hot_dry", "composite", "humid"], "listed_in": ["delhi", "iisc"], "status": "estimate",
+     "note": "Evergreen, 15-30 m (IISc: 50-100 ft). Growth speed is an estimate."},
+    {"id": "peepal", "common": "Peepal", "scientific": "Ficus religiosa", "size_class": "large", "growth": "slow",
+     "climates": ["hot_dry", "composite", "humid"], "listed_in": ["delhi"], "status": "estimate",
+     "note": "Very large crown; needs wide open space, not narrow streets. Size and growth are estimates."},
+    {"id": "amaltas", "common": "Amaltas (Indian laburnum)", "scientific": "Cassia fistula", "size_class": "small", "growth": "medium",
+     "climates": ["hot_dry", "composite"], "listed_in": ["delhi"], "status": "estimate",
+     "note": "Small, light crown that fits narrow footpaths. Size is an estimate."},
+    {"id": "indian_coral", "common": "Indian coral tree", "scientific": "Erythrina variegata", "size_class": "medium", "growth": "fast",
+     "climates": ["hot_dry", "composite", "humid"], "listed_in": ["delhi"], "status": "estimate",
+     "note": "Fast growing. Size, growth and humid suitability are estimates."},
+    {"id": "kadamb", "common": "Kadamb", "scientific": "Neolamarckia cadamba", "size_class": "large", "growth": "fast",
+     "climates": ["composite", "humid"], "listed_in": ["delhi"], "status": "estimate",
+     "note": "Fast growing; native to wetter regions. Listed by Delhi Forest Department; best in composite and humid climates (estimate)."},
+    {"id": "mango", "common": "Mango", "scientific": "Mangifera indica", "size_class": "large", "growth": "slow",
+     "climates": ["hot_dry", "composite", "humid"], "listed_in": ["delhi"], "status": "estimate",
+     "note": "Dense evergreen crown, 10-30 m. Slow to shade."},
+    {"id": "pongamia", "common": "Pongamia (Karanj)", "scientific": "Millettia pinnata", "size_class": "medium", "growth": "medium",
+     "climates": ["composite", "humid"], "listed_in": ["iisc", "bbmp"], "status": "estimate",
+     "note": "Not on the Delhi Forest Department list. Recommended for Bengaluru roadsides and shortlisted by BBMP for its compact crown; published heights conflict (7 m to 25 m)."}
+  ]
+}

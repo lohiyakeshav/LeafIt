@@ -1,7 +1,9 @@
 """Plan use-cases: save a plan, read it back with fresh metrics, its bill of materials, and a funding proposal."""
-from app.agents import proposal
+from starlette.concurrency import run_in_threadpool
+
+from app.agents import context, proposal
 from app.domain import market
-from app.domain.sim import prices
+from app.domain.sim import Block, prices
 from app.repositories import PlanRepository
 from app.services.block_service import BlockService
 from app.services.errors import NotFoundError
@@ -41,11 +43,21 @@ class PlanService:
             "unit_prices_inr": prices(plan.get("unit_cost")),
             "currency": await self.fx_service.get_currency(currency_code),
             "bill_of_materials": market.bom(block, plan["placements"]),
+            "place": _place(block),
         }
-        return proposal.write(ctx)
+        return await run_in_threadpool(proposal.write, ctx)   # the Gemini SDK call blocks: keep it off the event loop
 
     def find_plan(self, pid: str) -> dict:
         plan = self.plans.get_plan(pid)
         if not plan:
             raise NotFoundError("unknown plan")
         return plan
+
+
+def _place(block: Block) -> dict:
+    """The few facts about the place a funding proposal should rest on."""
+    b = context.place_brief(block, 0, 10)
+    out = {"climate_class": b["place"]["climate_class"], "area_ha": b["place"]["area_ha"], "existing_canopy_pct": b["land"]["existing_canopy_pct"]}
+    if "people" in b:
+        out.update(residents=b["people"]["residents"], vulnerable_residents=b["people"]["vulnerable_residents"])
+    return out

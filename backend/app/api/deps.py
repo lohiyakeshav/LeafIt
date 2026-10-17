@@ -6,7 +6,7 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from app.repositories import BlockRepository, FxRateRepository, PlanRepository, VendorRepository
+from app.repositories import BlockRepository, FxRateRepository, PlanRepository
 from app.services.agent_service import AgentService
 from app.services.area_service import AreaService
 from app.services.block_service import BlockService
@@ -17,7 +17,6 @@ from app.services.vendor_service import VendorService
 
 block_repository = BlockRepository()
 plan_repository = PlanRepository()
-vendor_repository = VendorRepository()
 fx_repository = FxRateRepository()
 
 block_service = BlockService(block_repository)
@@ -26,7 +25,7 @@ simulation_service = SimulationService(block_service)
 agent_service = AgentService(block_service)
 fx_service = FxService(fx_repository)
 plan_service = PlanService(plan_repository, block_service, simulation_service, fx_service)
-vendor_service = VendorService(vendor_repository, block_service, plan_service)
+vendor_service = VendorService(block_service, plan_service)
 
 
 def get_block_service() -> BlockService:

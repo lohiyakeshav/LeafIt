@@ -1,4 +1,4 @@
-"""Blocks: sample blocks shipped in data/blocks (read-only) and areas built from satellite data in data/areas.
+"""Blocks: sample areas shipped in data/blocks (real data, built by scripts/build_sample.py; read-only) and areas built from satellite data in data/areas.
 
 Built areas are a cache that expires (config.AREA_TTL_DAYS): nothing in the app lists or reopens old ones.
 """

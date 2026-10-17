@@ -8,11 +8,11 @@ from app import config
 from app.domain.area.grid import Bounds, Grid
 
 log = logging.getLogger("leafit.places")
-MAX_LANDMARKS = 6
+MAX_LANDMARKS = 10
 # Places type -> (our kind label, priority: lower comes first). The agent's brief can then say "protect the school".
 KINDS = {"school": "school", "primary_school": "school", "secondary_school": "school", "hospital": "clinic", "doctor": "clinic",
-         "bus_station": "bus stop", "bus_stop": "bus stop", "park": "park", "supermarket": "market", "market": "market"}
-ORDER = ["school", "clinic", "bus stop", "market", "park"]
+         "bus_station": "bus stop", "bus_stop": "bus stop", "park": "park", "market": "market", "shopping_mall": "market", "supermarket": "market"}
+ORDER = ["market", "bus stop", "school", "clinic", "park"]   # where people stand outdoors longest come first
 
 
 def pick(places: list[dict], grid: Grid) -> list[dict]:
@@ -45,7 +45,8 @@ async def fetch_landmarks(bounds: Bounds, grid: Grid) -> list[dict]:
                 "https://places.googleapis.com/v1/places:searchNearby",
                 headers={"X-Goog-Api-Key": config.GOOGLE_MAPS_SERVER_KEY,
                          "X-Goog-FieldMask": "places.displayName,places.location,places.types"},
-                json={"includedTypes": ["school", "hospital", "doctor", "bus_station", "park", "supermarket"], "maxResultCount": 20,
+                json={"includedTypes": ["market", "shopping_mall", "bus_stop", "bus_station", "school", "hospital", "park", "supermarket"],
+                      "maxResultCount": 20, "rankPreference": "POPULARITY",
                       "locationRestriction": {"circle": {"center": {"latitude": lat, "longitude": lng},
                                                          "radius": min(50_000.0, math.hypot(w, h) / 2)}}})
             return pick(r.raise_for_status().json().get("places", []), grid)

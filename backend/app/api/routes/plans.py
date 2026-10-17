@@ -9,7 +9,7 @@ router = APIRouter(tags=["plans"])
 @router.post("/plans")
 def create_plan(req: PlanIn, service: PlanServiceDep):
     uc = req.unit_cost.as_dict() if req.unit_cost else None
-    return service.create_plan(req.block_id, [p.model_dump() for p in req.placements], req.years, req.name, uc)
+    return service.create_plan(req.block_id, [p.model_dump(exclude_none=True) for p in req.placements], req.years, req.name, uc)
 
 
 @router.get("/plans/{pid}")
