@@ -3,9 +3,9 @@
 | Requirement | Deliverable | Status |
 |---|---|---|
 | Theme | **Sustainability & Social Impact** | done |
-| Proposal deck | `docs/submission/LeafIt_Submission.pptx` (14 slides, AI Builder Cup template) and its PDF | add the video link on slide 13 |
+| Proposal deck | `docs/submission/LeafIt_Submission.pptx` (14 slides, AI Builder Cup template) and `LeafIt_Submission.pdf`; video link on slide 13 | done |
 | Prototype on Google Cloud, using Google Cloud AI | **https://leafit.cloud.run**: Cloud Run (deployed from GitHub `main` by a Cloud Build trigger), Gemini on **Vertex AI**, Earth Engine | live |
-| 3-minute public video | script below; upload to YouTube as **Public/Unlisted** | to record |
+| 3-minute public video | **https://drive.google.com/file/d/1mLXgTHEWch1o-BW0rdctq1ABphMi_sK8/view?usp=sharing** (Google Drive, anyone with the link) | done |
 
 ## Before you record or submit
 
