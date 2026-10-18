@@ -18,7 +18,7 @@ from app.domain import species as species_mod
 TYPES = MODEL["types"]
 COOLING_CAP_C = MODEL["cooling_cap_c"]  # diminishing returns ceiling per cell (street level)
 # Published estimates of surface cooling differ ~8×, so street cooling is reported as a range: tree cool_c is the high end
-# (Schwaab et al. 2021) and drives the optimiser and map; cool_c_low (Ruiz-Valero et al. 2026) gives the low end.
+# (Schwaab et al. 2021) and drives the optimiser and map; cool_c_low (Ruiz-Valero et al. 2025) gives the low end.
 TREE_LOW_SHARE = TYPES["tree"]["cool_c_low"] / TYPES["tree"]["cool_c"]
 # Roof surface cooling from the surface energy balance: ΔT ≈ Δalbedo × sunlight ÷ heat-transfer coefficient
 ROOF_ALBEDO_GAIN, SUN_W_M2, HEAT_TRANSFER_W_M2K = (MODEL["roof"][k] for k in ("albedo_gain", "sun_w_m2", "heat_transfer_w_m2k"))

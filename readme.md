@@ -16,7 +16,7 @@ Search for a real place, mark out your neighbourhood on the satellite map, and t
 
 ## How the numbers are calculated
 
-Every figure comes from a grid model on 10 m cells, not from the AI. Each cell starts at its measured Landsat surface temperature; each tree, cool roof or shelter spreads its effect over nearby cells. Published studies of tree cooling differ about eightfold, so street cooling is shown as a **range**: low end from Ruiz-Valero et al. 2026 (half canopy cover lowers surface temperature by 0.268 °C), high end from Schwaab et al. 2021 (tree-covered areas up to 4 °C cooler than built-up ones in southern Europe). Every coefficient is cited, derived from cited figures, or labelled a modelling choice on the in-app **Method** page (`/assumptions`, served from `backend/app/domain/assumptions.py`). Gemini only chooses between options and explains them; every number it writes is checked against the simulator.
+Every figure comes from a grid model on 10 m cells, not from the AI. Each cell starts at its measured Landsat surface temperature; each tree, cool roof or shelter spreads its effect over nearby cells. Published studies of tree cooling differ about eightfold, so street cooling is shown as a **range**: low end from Ruiz-Valero et al. 2025 (half canopy cover lowers surface temperature by 0.268 °C), high end from Schwaab et al. 2021 (tree-covered areas up to 4 °C cooler than built-up ones in southern Europe). Every coefficient is cited, derived from cited figures, or labelled a modelling choice on the in-app **Method** page (`/assumptions`, served from `backend/app/domain/assumptions.py`). Gemini only chooses between options and explains them; every number it writes is checked against the simulator.
 
 ## Architecture
 
