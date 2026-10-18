@@ -125,7 +125,7 @@ def test_calibration_matches_the_cited_studies():
     high = lambda cover: centre(TYPES["tree"]["cool_c"], KERNELS["tree"], COOLING_CAP_C, cover)
     low = lambda cover: centre(TYPES["tree"]["cool_c"] * TREE_LOW_SHARE, KERNELS["tree"], COOLING_CAP_C, cover)
     air = lambda cover: centre(AIR["per_tree_c"], AIR_KERNEL, AIR["cap_c"], cover)
-    assert abs(low(0.5) - 0.268) < 0.015                 # Ruiz-Valero et al. 2026: half canopy → 0.268 °C surface
+    assert abs(low(0.5) - 0.268) < 0.015                 # Ruiz-Valero et al. 2025: half canopy → 0.268 °C surface
     assert 1.0 < high(0.5) < 2.0 and high(1.0) < 4.0     # Schwaab et al. 2021: tree vs built-up surfaces 0–4 °C (southern Europe)
     assert abs(air(1.0) - 1.0) < 0.05                    # Bowler et al. 2010: parks ~1 °C cooler air
 

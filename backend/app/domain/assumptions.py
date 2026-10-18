@@ -51,7 +51,7 @@ ASSUMPTIONS = [
             "built-up areas in southern Europe, the hot-summer climate closest to India; LeafIt sets half cover to half of that 4 °C top (2 °C) before cooling levels off per cell (see Stacking), which brings it to the figures above. The first measures what "
             "adding canopy does; the second compares tree areas with built-up ones. Each tree's share is spread over the cells around it, not added "
             "on top, so area-wide totals match the studies. Plans are optimised and compared on the high end.",
-     "sources": [_src("Ruiz-Valero et al. (2026), Quantifying urban tree canopy cooling capacity using Bayesian hierarchical models and satellite imagery, Plants, People, Planet", "https://doi.org/10.1002/ppp3.70085"),
+     "sources": [_src("Ruiz-Valero et al. (2025), Quantifying urban tree canopy cooling capacity using Bayesian hierarchical models and satellite imagery, Plants, People, Planet", "https://doi.org/10.1002/ppp3.70085"),
                  _src("Schwaab et al. (2021), The role of urban trees in reducing land surface temperatures in European cities, Nature Communications 12", "https://doi.org/10.1038/s41467-021-26768-w")]},
     {"item": "Air cooling is calibrated to one review, not measured here", "key": True,
      "value": f"Full canopy cools the air by ~1 °C, half canopy by ~0.6 °C; never more than {AIR['cap_c']} °C",
@@ -116,17 +116,17 @@ ASSUMPTIONS = [
      "value": f"₹{TYPES['tree']['cost']:,} per tree: sapling, metal guard, planting and 3 years of care",
      "status": "estimate",
      "why": "An IISc costing (2015) gives ₹200–400 sapling + ₹200 planting + ₹1,000 metal guard + ₹400 for 3 years' care = ₹1,800–2,000. "
-            "MCD spent ₹2.77 crore on 6,39,659 saplings for the 2010 Commonwealth Games (~₹430 each, without guards). "
+            "MCD spent ₹2.77 crore on 6,39,659 saplings for the 2010 Commonwealth Games (~₹43 each, without guards). "
             "₹3,000 allows for price rises since 2015: get vendor quotes through LeafIt.",
      "sources": [_src("IISc ENVIS Technical Report 90 (2015): plantation costing", "https://wgbis.ces.iisc.ac.in/energy/water/paper/ETR90/sec7.html"),
-                 _src("Lok Sabha unstarred question 3896 (2012): MCD Commonwealth Games planting", "https://eparlib.nic.in/bitstream/123456789/594902/1/98233.pdf")]},
+                 _src("Lok Sabha unstarred question 3896 (2012): MCD Commonwealth Games planting", "https://web.archive.org/web/20240808011718/https://eparlib.nic.in/bitstream/123456789/627278/1/127937.pdf")]},
     {"item": "Cool roof: roof surface",
      "value": f"{ROOF_SURFACE_C} °C cooler roof surface × roof share of the cell (shown on the map)",
      "status": "derived",
      "why": f"Surface energy balance: albedo gain {ROOF_ALBEDO_GAIN} (aged white coating vs concrete) × {SUN_W_M2} W/m² sun "
             f"÷ {HEAT_TRANSFER_W_M2K} W/m²K ≈ {ROOF_SURFACE_C} °C. Measurements agree it is conservative: Berkeley Lab found dark roofs up to ~50 °C "
             "above air temperature and reflective roofs ~11 °C above it.",
-     "sources": [_src("Konopacki et al. (1998), Demonstration of energy savings of cool roofs, Lawrence Berkeley National Laboratory LBNL-40673", "https://www.osti.gov/biblio/296885")]},
+     "sources": [_src("Konopacki et al. (1998), Demonstration of energy savings of cool roofs, Lawrence Berkeley National Laboratory LBNL-40673", "https://eta-publications.lbl.gov/publications/demonstration-energy-savings-cool")]},
     {"item": "Cool roof: at street level",
      "value": f"{TYPES['cool_roof']['cool_c']} °C × the roof's share of its cell, spread over ~{TYPES['cool_roof']['sigma'] * 10 * 3:.0f} m; "
               f"₹{TYPES['cool_roof']['cost']}/m²",
@@ -142,7 +142,7 @@ ASSUMPTIONS = [
      "status": "cited",
      "why": "DTC approved solar bus queue shelters at ₹10 lakh each (2002). In 2018 Delhi's transport department put its standard shelter at "
             "~₹8 lakh and a stainless-steel one at ~₹20 lakh.",
-     "sources": [_src("The Hindu via India Environment Portal (2002): DTC goes for solar power", "https://indiaenvironmentportal.org.in/news-clippings/dtc-goes-for-solar-power"),
+     "sources": [_src("The Hindu via India Environment Portal (2002): DTC goes for solar power", "https://indiaenvironmentportal.org.in/news-clippings/dtc-goes-for-solar-power/"),
                  _src("Hindustan Times (30 Mar 2018): After 4 failed tenders, govt to build 1,397 bus stops by itself", "https://www.pressreader.com/india/hindustan-times-delhi/20180330/281638190759894")]},
     {"item": "Where a tree fits",
      "value": "Carriageways and buildings are off limits; spacing sets how many trees fit in a cell, by species size class",
