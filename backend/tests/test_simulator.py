@@ -6,7 +6,8 @@ import numpy as np
 import pytest
 
 from app.config import ROOT
-from app.domain.sim import ASSUMPTIONS, Block, maturity, simulate
+from app.domain.assumptions import ASSUMPTIONS
+from app.domain.sim import Block, evaluate, maturity, simulate
 
 
 def test_nothing_placed_changes_nothing(cells):
@@ -17,8 +18,8 @@ def test_nothing_placed_changes_nothing(cells):
 def test_more_trees_cool_more_with_diminishing_returns(cells):
     assert cells.metrics(cells.trees(200))["temp_reduction_c"] > cells.metrics(cells.trees(50))["temp_reduction_c"] > 0
     one = cells.trees(1)[0]
-    peak = lambda n: cells.metrics([{**one, "count": n}])["peak_reduction_c"]
-    assert peak(2) < 2 * peak(1)                              # two trees in one cell give less than twice one tree
+    peak = lambda n: evaluate(cells.block, [{**one, "count": n}], 10).street.max()   # unrounded: one tree's effect is small
+    assert peak(1) < peak(2) < 2 * peak(1)                    # two trees in one cell give less than twice one tree
 
 
 def test_assumptions_stay_inside_their_sources(block, cells):
@@ -26,7 +27,7 @@ def test_assumptions_stay_inside_their_sources(block, cells):
     full = simulate(block, cells.trees(1000), years=30)
     assert -0.5 < full["metrics"]["aqi_change"] < 0          # trees barely move AQI (Nowak 2013: <= 0.24 % citywide)
     assert full["breakdown"]["aq_gain_pct"] <= 0.24
-    assert all(a["status"] in {"cited", "derived", "estimate", "modelling choice", "under review"} for a in ASSUMPTIONS)
+    assert all(a["status"] in {"cited", "derived", "estimate", "modelling choice"} for a in ASSUMPTIONS)
     assert all(a["sources"] for a in ASSUMPTIONS if a["status"] in {"cited", "derived", "estimate"})
 
 
@@ -45,7 +46,7 @@ def test_costs_and_breakdown_add_up(block, cells):
     mix = cells.mix()
     r, c = map(int, cells.roofs[0])
     m = cells.metrics(mix)
-    assert m["total_cost_inr"] == round(3 * 3000 + block.roof_area[r, c] * 250 + 1_000_000)
+    assert m["total_cost_inr"] == round(3 * 3000 + block.roof_area[r, c] * 300 + 1_000_000)
     bd = simulate(block, mix)["breakdown"]
     assert bd["trees"] == 3 and bd["stops"] == 1 and sum(bd["cost_parts"].values()) == m["total_cost_inr"]
     assert m["co2_captured_kg_per_year"] == round(bd["trees"] * bd["tree_co2_kg"] * bd["maturity"])

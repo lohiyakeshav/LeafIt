@@ -1,6 +1,6 @@
 """Build a sample area from real data and ship it with the app, so anyone can open it instantly (no Earth Engine wait).
 
-    cd backend && conda run -n leafit python scripts/build_sample.py [--id lajpat_nagar] [--lat 28.569229 --lng 77.241773] [--size 700]
+    cd backend && .venv/bin/python scripts/build_sample.py [--id lajpat_nagar] [--lat 28.569229 --lng 77.241773] [--size 700]
 
 Same pipeline as a user-drawn area (Landsat heat, WorldCover, Open Buildings, Meta/WRI canopy, WorldPop, OpenStreetMap,
 Places, climate normals). It retries until OpenStreetMap answers, because a sample without real roads would be second-rate.

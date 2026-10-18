@@ -1,5 +1,7 @@
 """Simulation use-cases: run the cooling model on a block, and publish its assumptions."""
-from app.domain.sim import ASSUMPTIONS, Block, simulate
+from app.agents.checks import ASSUMPTION as CHECKS_ASSUMPTION
+from app.domain.assumptions import ASSUMPTIONS
+from app.domain.sim import Block, simulate
 from app.services.block_service import BlockService
 from app.services.errors import InvalidInputError
 
@@ -17,5 +19,6 @@ class SimulationService:
         except ValueError as e:   # e.g. a placement outside the grid
             raise InvalidInputError(str(e)) from e
 
-    def get_assumptions(self) -> dict:
-        return ASSUMPTIONS
+    def get_assumptions(self) -> list[dict]:
+        """The model's assumptions, then how the AI planner's plans are checked."""
+        return [*ASSUMPTIONS, CHECKS_ASSUMPTION]

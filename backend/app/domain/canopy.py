@@ -17,7 +17,8 @@ COOLING_CAP_C = MODEL["cooling_cap_c"]
 def kernel(sigma: float) -> np.ndarray:
     rad = int(np.ceil(3 * sigma))
     y, x = np.mgrid[-rad:rad + 1, -rad:rad + 1]
-    return np.exp(-(x**2 + y**2) / (2 * sigma**2))  # peak 1 at the tree's own cell
+    k = np.exp(-(x**2 + y**2) / (2 * sigma**2))
+    return k / k.sum()  # sums to 1: an item's cooling is spread over its neighbours, not multiplied by them
 
 
 def shade_weight(height_m: np.ndarray) -> np.ndarray:

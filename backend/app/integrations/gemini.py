@@ -89,7 +89,7 @@ def _count_call() -> None:
 
 
 def generate(llm, **kwargs):
-    """llm.models.generate_content, riding out a per-minute rate limit (429) or a busy/failing model (500, 503) instead of
+    """llm.models.generate_content, riding out a per-minute rate limit (429) or a busy/failing model (500, 503, 504) instead of
     failing the whole plan.
 
     The server's own "retry in N s" is honoured (capped); a daily quota (it won't reset in time), a long wait or any other
@@ -101,7 +101,7 @@ def generate(llm, **kwargs):
             return llm.models.generate_content(**kwargs)
         except (genai_errors.ClientError, genai_errors.ServerError) as e:
             daily = "PerDay" in str(e)
-            wait = None if daily else _retry_after(e) + 1 if e.code == 429 else 3.0 if e.code in (500, 503) else None
+            wait = None if daily else _retry_after(e) + 1 if e.code == 429 else 3.0 if e.code in (500, 503, 504) else None
             if wait is None or attempt == RATE_LIMIT_RETRIES or wait > RATE_LIMIT_MAX_WAIT_S:
                 raise
             time.sleep(wait)

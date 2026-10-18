@@ -1,6 +1,6 @@
 """Regenerate shared/fixtures/golden.json from the Python simulator.
 
-Run from backend/:  conda run -n leafit python scripts/make_golden.py
+Run from backend/:  .venv/bin/python scripts/make_golden.py
 Both test suites (pytest here, vitest in frontend/) replay these cases, so the browser simulator can never
 drift from the authoritative one. Regenerate only when the model changes ON PURPOSE.
 

@@ -145,7 +145,7 @@ void showMetricWhy(BuildContext context, String key, Map<String, dynamic>? m, Ma
         'Cooling',
         'Cooling',
         'How much cooler it gets where people are: averaged over the streets, parks and open ground of the block (10 m cells).',
-        'Each tree cools its own cell by up to ${n(b, 'tree_cool_c')} °C when fully grown, fading out over about ${n(b, 'tree_reach_m')} m. '
+        'A fully grown tree in every 10 m cell cools the surface by ${n(b, 'tree_cool_c')} °C; each tree\'s share is spread over about ${n(b, 'tree_reach_m')} m around it. '
             'A cool roof makes the roof itself about ${n(b, 'roof_surface_c')} °C cooler (you see that on the map), but only spills '
             'up to ${n(b, 'roof_cool_c')} °C onto the street around it, so it counts little here. '
             'Trees grow into their effect: about 34% by year 5, 57% by year 10 and 81% by year 20. '
@@ -251,7 +251,7 @@ void showMetricWhy(BuildContext context, String key, Map<String, dynamic>? m, Ma
             ),
           ),
         const SizedBox(height: 18),
-        Text('Estimates from the LeafIt grid model. Every coefficient has a source; tap below to see them.',
+        Text('Estimates from the LeafIt grid model. Each coefficient is sourced or marked as a modelling choice; tap below to see them.',
             style: mono(11)),
         const SizedBox(height: 14),
         Align(

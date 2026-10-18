@@ -30,16 +30,44 @@ function _short(x) {
   return s.includes('.') ? s.replace(/\.?0+$/, '') : s;
 }
 
+/** A cooling figure: "−0.15°", or "0.00°" when it rounds to nothing (no sign on a zero). */
 export function formatDeg(v, d = 2) {
-  return `${Math.abs(v) >= 0.5 / (d === 1 ? 10 : 100) ? '−' : ''}${Math.abs(v).toFixed(d)}°`;
+  const x = Math.abs(Number(v ?? 0));
+  return `${x >= 0.5 * 10 ** -d ? '−' : ''}${x.toFixed(d)}°`;
 }
 
+/**
+ * A cooling figure as the published range, e.g. "−0.02 to −0.15°". Studies of tree cooling differ ~8×, so the simulator
+ * returns the high end in `m[key]` and the low end in `m.low_estimate[key]` (Method page: "Tree cooling" and "Stacking").
+ */
+export function degRange(m, key, d = 2) {
+  const hi = Math.abs(Number(m?.[key] ?? 0)), lo = Math.abs(Number(m?.low_estimate?.[key] ?? hi));
+  if (hi < 0.5 * 10 ** -d || lo.toFixed(d) === hi.toFixed(d)) return formatDeg(hi, d);
+  return `−${lo.toFixed(d)} to −${hi.toFixed(d)}°`;
+}
+
+/** Cost per °C over the same range: cheapest at the high end of cooling, dearest at the low end. */
+export function perDegreeRange(m, inr) {
+  const hi = m?.cost_per_degree_inr, lo = m?.low_estimate?.cost_per_degree_inr;
+  if (hi == null) return '—';
+  return lo == null || inr(lo) === inr(hi) ? inr(hi) : `${inr(hi)}–${inr(lo)}`;
+}
+
+/** Share of outdoors still too hot, over the range (fewer cells cool below the threshold at the low end). */
+export function exposureRange(m) {
+  const hi = Math.round(Number(m?.heat_exposure_pct ?? 0)), lo = Math.round(Number(m?.low_estimate?.heat_exposure_pct ?? hi));
+  return lo === hi ? `${hi}%` : `${hi}–${lo}%`;
+}
+
+/** An AQI change: "−0.02" (lower is cleaner), or "0.00". */
 export function formatAqi(v) {
-  return Math.abs(v) < 0.005 ? '0.00' : Math.abs(v).toFixed(2);
+  const x = Math.abs(Number(v ?? 0));
+  return x < 0.005 ? '0.00' : `−${x.toFixed(2)}`;
 }
 
+/** CO₂ in tonnes: "12.7 t". */
 export function formatTons(kg) {
-  return `${(kg / 1000).toFixed(1)} t`;
+  return `${(Number(kg ?? 0) / 1000).toFixed(1)} t`;
 }
 
 export function delhiTime() {

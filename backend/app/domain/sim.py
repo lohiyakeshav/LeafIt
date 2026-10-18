@@ -1,4 +1,4 @@
-"""Grid surrogate model (PRD §8). Fast, explainable, labelled 'estimated' in the UI."""
+"""The cooling model: a fast grid surrogate, explainable, labelled 'estimated' in the UI. Its sources are in app/domain/assumptions.py."""
 import json
 from dataclasses import dataclass
 from functools import cached_property
@@ -7,26 +7,28 @@ from pathlib import Path
 import numpy as np
 from scipy.ndimage import convolve
 
-from app.config import MODEL, SPECIES
+from app.config import MODEL
 from app.domain import canopy, plantable
 from app.domain import species as species_mod
 
-# Every coefficient below has a source or a stated derivation; see docs/assumptions.md and GET /assumptions.
+# Every coefficient below has a source, a stated derivation, or is labelled a modelling choice: see app/domain/assumptions.py (GET /assumptions).
 # The numbers live in shared/model.json so the browser simulator (frontend/src/model) uses exactly the same ones.
-# Meaning of each: types.*.cost ₹ per unit · cool_c °C at own cell (mature) · sigma decay (cells);
+# Meaning of each: types.*.cost ₹ per unit · cool_c °C over an area with one mature item per cell (spread by a kernel that sums to 1) · sigma decay (cells);
 # cool_roof.cost is per m² and cool_c is spill-over onto the street; shade_stop is exposure only, not ambient.
 TYPES = MODEL["types"]
 COOLING_CAP_C = MODEL["cooling_cap_c"]  # diminishing returns ceiling per cell (street level)
+# Published estimates of surface cooling differ ~8×, so street cooling is reported as a range: tree cool_c is the high end
+# (Schwaab et al. 2021) and drives the optimiser and map; cool_c_low (Ruiz-Valero et al. 2026) gives the low end.
+TREE_LOW_SHARE = TYPES["tree"]["cool_c_low"] / TYPES["tree"]["cool_c"]
 # Roof surface cooling from the surface energy balance: ΔT ≈ Δalbedo × sunlight ÷ heat-transfer coefficient
 ROOF_ALBEDO_GAIN, SUN_W_M2, HEAT_TRANSFER_W_M2K = (MODEL["roof"][k] for k in ("albedo_gain", "sun_w_m2", "heat_transfer_w_m2k"))
 ROOF_SURFACE_C = round(ROOF_ALBEDO_GAIN * SUN_W_M2 / HEAT_TRANSFER_W_M2K, 1)  # ≈ 9.3 °C on the roof itself
-TREE_CO2_KG_YR = MODEL["tree"]["co2_kg_yr"]            # mature urban street tree; literature range ~4–340 kg
+TREE_CO2_KG_YR = MODEL["tree"]["co2_kg_yr"]            # 0.28 kg C/m² of cover/yr (Nowak et al. 2013) × 50 m² × 44/12
 GROWTH_TAU_YEARS = MODEL["tree"]["growth_tau_years"]  # crown growth is fast early and slows later: effect = 1 − e^(−years/τ)
 CANOPY_M2_PER_TREE = MODEL["tree"]["canopy_m2"]       # mature street-tree crown ~8 m across
 NOWAK_AQ_GAIN = MODEL["air_quality"]["nowak_gain"]    # best-case citywide PM2.5 improvement from trees (Atlanta, Nowak et al. 2013)
 NOWAK_CANOPY = MODEL["air_quality"]["nowak_canopy"]   # ...at roughly this much canopy cover
 RULES = MODEL["placement_rules"]
-MAX_TREES_PER_CELL = RULES["tree"]["max_count_per_cell"]
 LANDMARK_RADIUS = MODEL["landmark_radius_cells"]      # cells (~50 m) averaged for "cooling near the school" etc.
 HOT_PERCENTILE = MODEL["hot_percentile"]              # outdoor cells above this baseline percentile count as "exposed"
 OUTDOOR_BELOW = MODEL["outdoor_building_frac_below"]
@@ -37,163 +39,6 @@ LEGACY_ROAD_CARRIAGEWAY = 0.45   # areas without OSM road data: a land-cover roa
 def maturity(years: int) -> float:
     """Share of a tree's full effect after `years`: 8% in year 1, 34% by 5, 57% by 10, 81% by 20."""
     return float(1 - np.exp(-max(years, 1) / GROWTH_TAU_YEARS))
-
-
-def _src(title, url):
-    return {"title": title, "url": url}
-
-
-# Served by GET /assumptions for the "How we calculate this" screen.
-# status: "cited" (a source gives this value) · "derived" (computed from cited figures) ·
-#         "estimate" (best guess inside a cited range) · "modelling choice" · "under review"
-ASSUMPTIONS = [
-    # The three assumptions most worth challenging come first ("key": True); the page folds the rest away.
-    {"item": "Air cooling is a literature ceiling, not a measurement", "key": True,
-     "value": f"Air cools at most ~{MODEL['air']['cap_c']} °C under dense canopy; trees ~8 m apart give roughly 0.4–0.8 °C",
-     "status": "estimate",
-     "why": "Reviews of urban greening measure air cooling of about 1 °C in parks, 0.8 °C for street trees and ~1.6 °C for urban forest. "
-            "LeafIt uses one saturating curve with that ceiling, set so a typical street lands inside the street-tree range. "
-            "The surface figure is calibrated against satellite temperatures; the air figure is not.",
-     "sources": [_src("Bowler et al. (2010), Urban greening to cool towns and cities, Landscape and Urban Planning", "https://doi.org/10.1016/j.landurbplan.2010.05.006")]},
-    {"item": "Existing trees come from satellite canopy data of varying age", "key": True,
-     "value": "Canopy cover and height per 10 m cell from Meta/WRI (images mostly 2018–2020), else ESA WorldCover 2021 tree class",
-     "status": "modelling choice",
-     "why": "Trees planted or cut since the imagery are not seen. The source used is recorded for each area, and when the two sources disagree "
-            "the planner is told. Existing shade counts first, so new trees next to it add less. Trees in the 150 m ring around the area count too.",
-     "sources": []},
-    {"item": "The humid-climate spacing limit is a rule, not a simulation", "key": True,
-     "value": f"In humid climates, at most {round(MODEL['humid']['max_window_canopy'] * 100)}% of any {MODEL['humid']['window_cells']}×{MODEL['humid']['window_cells']}-cell window may be crown",
-     "status": "modelling choice",
-     "why": "Studies of Indian cities find dense canopy cools dry cities but can raise the heat index where humidity is high, by blocking air movement. "
-            "LeafIt does not model wind. It limits canopy density in humid areas so streets stay open. The climate class (hot-dry, composite or humid) comes from "
-            "Open-Meteo humidity normals and only switches this rule on.",
-     "sources": []},
-    {"item": "Where a tree fits",
-     "value": "Carriageways and buildings are off limits; spacing sets how many trees fit in a cell, by species size class",
-     "status": "modelling choice",
-     "why": "A cell holds as many trees as crowns fit (spacing of 6–12 m by size class), limited by free ground after buildings, carriageway and existing canopy. "
-            "Cells already ≥60% under canopy are closed. The first blocking reason is the one shown.",
-     "sources": []},
-    {"item": "Road widths are estimated",
-     "value": "Carriageway from an OpenStreetMap width tag, else lanes × 3.5 m, else a default for the road type",
-     "status": "modelling choice",
-     "why": "Most Indian roads have no width tag, so type defaults (primary 14 m, secondary 10.5 m, tertiary 7.5 m, residential 5.5 m, service 4 m) are used. "
-            "Footways and paths are not carriageway: their edges stay plantable.",
-     "sources": []},
-    {"item": "Species sizes and suitability",
-     "value": "Eight to ten native street trees, each with a size class, growth speed and climate suitability",
-     "status": "estimate",
-     "why": "Where the sources below give no crown figure, the size class is an estimate. Only crown area and growth speed enter the model; "
-            "evapotranspiration is not modelled. Pick a species yourself or let LeafIt choose the best fit for each spot.",
-     "sources": [_src(v["title"], v["url"]) for v in SPECIES.get("sources", {}).values()]},
-    {"item": "Trees, roofs and shelters serve different people",
-     "value": "Trees are ranked by street cooling per rupee; cool roofs for homes and shaded bus stops get a share of the budget the planner chooses",
-     "status": "modelling choice",
-     "why": "A cool roof barely cools the street but cools the rooms below; a shelter cools nobody's air but shades people who wait. "
-            "Putting them on one scale would need a conversion nobody has measured, so the AI weighs them against the brief: up to 60% of the "
-            "budget for roofs on the homes with the most residents (or vulnerable residents), and shelters at mapped bus stops first "
-            "(at most 40% of the budget, or one shelter when it costs half or less).",
-     "sources": []},
-    {"item": "Species mix",
-     "value": "When LeafIt picks species it aims for no single species above 30% of a plan; the plan check shows the real share",
-     "status": "modelling choice",
-     "why": "The best-shading species everywhere would make a monoculture that one pest or disease could wipe out. Urban foresters follow "
-            "Santamour's 10-20-30 rule (at most 10% of any species, 20% of a genus, 30% of a family); 30% per species is what the "
-            "seven to nine species that suit a climate can usually meet. Trees move to the next-best species where that costs least shade. "
-            "A whole cell moves at once and must fit its trees, so where most spots are narrow (only small and medium crowns fit) a plan "
-            "can stay above 30%: the plan check then reports the actual share and suggests mixing species by hand.",
-     "sources": []},
-    {"item": "People and vulnerable residents",
-     "value": "WorldPop 100 m population with age and sex, shared onto buildings by floor area; shown per zone, not per cell",
-     "status": "modelling choice",
-     "why": "100 m pixels are split among the buildings inside them so each pixel's total is kept. Outdoor exposure is the number of residents within about 100 m. "
-            "The equity figure is the average cooling in the most exposed quarter of cells (children under 5 and adults over 65 weigh most). "
-            "Buildings without a height in Open Buildings are taken as 6 m (about two storeys) when sharing people out.",
-     "sources": []},
-    {"item": "Tree cooling",
-     "value": f"Up to {TYPES['tree']['cool_c']} °C off its 10 m cell's surface temperature when fully grown",
-     "status": "derived",
-     "why": "A Landsat study controlling for other factors found ~0.27 °C cooler surfaces when canopy covers half of a 30 m unit. "
-            "One mature crown (~50 m²) covers about half of a 10 m cell, so ~0.3 °C per tree. Shade on pavement itself can be "
-            "20 °C+ cooler, but a satellite pixel mixes shade, sun and walls.",
-     "sources": [_src("Local cooling from urban tree canopy, Plants People Planet (2025)", "https://eprints.whiterose.ac.uk/id/eprint/234726"),
-                 _src("Woodland Trust/Cardiff thermal imaging: 20 °C shade vs sun", "https://bosf.org.uk/?p=3568")]},
-    {"item": "How far cooling reaches",
-     "value": f"Fades with distance, mostly gone by ~{TYPES['tree']['sigma'] * 10 * 3:.0f} m",
-     "status": "cited",
-     "why": "Satellite studies find tree cooling significant up to 30–90 m from green space; small parks show effects to ~18 m.",
-     "sources": [_src("Gallay et al. (2023), cooling distance of urban green", "https://ideas.repec.org/a/gam/jsusta/v15y2023i4p3705-d1071642.html"),
-                 _src("Park shape and cooling distance, Landscape Ecology (2024)", "https://link.springer.com/article/10.1007/s10980-024-01818-y")]},
-    {"item": "Tree growth",
-     "value": f"Effect grows as 1 − e^(−years/{GROWTH_TAU_YEARS}): 34% by year 5, 57% by year 10, 81% by year 20",
-     "status": "derived",
-     "why": "Street-tree crowns grow fastest in the first 15 years and slow after; crowns keep widening for decades "
-            "(linden crown growth flattens around 45 years).",
-     "sources": [_src("Peper et al., street-tree growth in Modesto (USDA Forest Service)", "https://research.fs.usda.gov/treesearch/46301"),
-                 _src("Tilia physical dimensions over time, Arboriculture & Urban Forestry", "https://auf.isa-arbor.com/content/28/5/209")]},
-    {"item": "Tree CO₂",
-     "value": f"{TREE_CO2_KG_YR} kg CO₂ per fully grown tree per year",
-     "status": "estimate",
-     "why": "Measured street trees capture 3.5–13 kg/yr (Helsinki); larger trees 16–340 kg/yr by trunk size (Chicago); "
-            "a citywide average is ~40 kg/yr (Sacramento). 21.8 kg is a conservative middle for Delhi street trees.",
-     "sources": [_src("McPherson (1998), carbon sequestration by urban trees, USDA", "https://www.fs.usda.gov/psw/publications/mcpherson/psw_1998_mcpherson003.pdf")]},
-    {"item": "Air quality",
-     "value": f"Best case {NOWAK_AQ_GAIN * 100:.2f}% cleaner air at {NOWAK_CANOPY * 100:.0f}% canopy, scaled to the canopy this plan adds "
-              f"({CANOPY_M2_PER_TREE} m² per grown tree)",
-     "status": "derived",
-     "why": "Trees remove PM2.5 but barely move a city's AQI: modelled improvement was 0.05–0.24% across ten US cities. "
-            "We use the best case (Atlanta) and scale it to this block, so the AQI change is honest and small.",
-     "sources": [_src("Nowak et al. (2013), PM2.5 removal by trees in ten US cities", "https://pubmed.ncbi.nlm.nih.gov/23624337/")]},
-    {"item": "Tree cost",
-     "value": f"₹{TYPES['tree']['cost']:,} per tree: sapling, metal guard, planting and 3 years of care",
-     "status": "estimate",
-     "why": "An itemised Indian costing gives ₹200 planting + ₹1,000 metal guard + ₹400 for 3 years' care (1990s prices); "
-            "MCD paid ~₹430 per small sapling in 2010. ₹3,000 is a low-end current figure: get vendor quotes through LeafIt.",
-     "sources": [_src("IISc energy-plantation costing (planting, guard, 3-yr care)", "https://wgbis.ces.iisc.ac.in/energy/water/paper/ETR90/sec7.html"),
-                 _src("Lok Sabha answer: MCD Commonwealth Games planting cost", "https://eparlib.nic.in/bitstream/123456789/594902/1/98233.pdf")]},
-    {"item": "Cool roof: roof surface",
-     "value": f"{ROOF_SURFACE_C} °C cooler roof surface × roof share of the cell (shown on the map)",
-     "status": "derived",
-     "why": f"Surface energy balance: albedo gain {ROOF_ALBEDO_GAIN} (aged white coating vs concrete) × {SUN_W_M2} W/m² sun "
-            f"÷ {HEAT_TRANSFER_W_M2K} W/m²K ≈ {ROOF_SURFACE_C} °C. Measurements agree: white roofs run 20 °C+ cooler than dark ones at peak (LBNL).",
-     "sources": [_src("US DOE: cool roofing technologies (LBNL)", "https://www.energy.gov/sites/prod/files/2015/07/f25/Cool_Roofing_Technologies.pdf"),
-                 _src("LBNL roof surface vs air temperature (OSTI)", "https://www.osti.gov/biblio/296884")]},
-    {"item": "Cool roof: at street level",
-     "value": f"{TYPES['cool_roof']['cool_c']} °C × roof share, spilling ~{TYPES['cool_roof']['sigma'] * 10 * 3:.0f} m onto nearby streets; "
-              f"₹{TYPES['cool_roof']['cost']}/m²",
-     "status": "estimate",
-     "why": "A roof cools mostly itself and the rooms below (1.3–2 °C indoors in Kerala and Hyderabad pilots); its effect on the street "
-            "is small (city-wide retrofits are modelled at up to 0.5 °C). Cost sits in the Indian range: lime-wash ₹5/m², membranes ~₹140/m².",
-     "sources": [_src("NRDC: cool roof programs in Ahmedabad and Hyderabad", "https://www.nrdc.org/experts/anjali-jaiswal/keeping-it-cool-models-city-cool-roof-programs"),
-                 _src("Rooftop albedo and city cooling, Google Research (2025)", "https://research.google/pubs/estimating-high-resolution-albedo-for-urban-applications/")]},
-    {"item": "Shaded bus stop",
-     "value": f"₹{TYPES['shade_stop']['cost'] / 1e5:.0f} lakh each; removes its cell from heat exposure, no air cooling",
-     "status": "cited",
-     "why": "DTC approved solar bus shelters at ₹10 lakh each; stainless-steel stops were quoted at ₹20 lakh (2018).",
-     "sources": [_src("DTC solar bus queue shelters, ₹10 lakh each", "https://indiaenvironmentportal.org.in/news-clippings/dtc-goes-for-solar-power"),
-                 _src("Hindustan Times (2018): Delhi to build 1,397 bus stops itself", "https://www.pressreader.com/india/hindustan-times-delhi/20180330/281638190759894")]},
-    {"item": "Stacking",
-     "value": f"Cooling per cell levels off towards {COOLING_CAP_C} °C",
-     "status": "modelling choice",
-     "why": "A cell can only be so shaded. For scale: fully canopied vs treeless spots differ by 4–5 °C in air temperature.",
-     "sources": [_src("Ziter et al. (2019), PNAS: canopy cover and urban heat", "https://www.sciencedaily.com/releases/2019/03/190325173305.htm")]},
-    {"item": "Heat exposure",
-     "value": f"Share of outdoor cells hotter than the block's {HOT_PERCENTILE}th-percentile surface temperature today",
-     "status": "modelling choice",
-     "why": "A relative 'hottest quarter' works on any block without a city-specific threshold. Measured at street level.", "sources": []},
-    {"item": "Near a landmark",
-     "value": f"Average cooling within ~{LANDMARK_RADIUS * 10} m (about a one-minute walk)",
-     "status": "modelling choice", "why": "", "sources": []},
-    {"item": "Street vs surface cooling",
-     "value": "'Cooling' is averaged over streets, parks and open ground, where people are; the map also shows roof surfaces",
-     "status": "modelling choice",
-     "why": "Plans are judged by what people feel outdoors, so the AI optimises street cooling. Roofs still show their full surface effect on the map.",
-     "sources": []},
-    {"item": "Baseline heat",
-     "value": "Satellite land-surface temperature, not air temperature",
-     "status": "modelling choice",
-     "why": "Surfaces swing far more than air: shaded vs sunlit pavement differ by 20 °C+, air by a few degrees.", "sources": []},
-]
 
 
 def _opt(d: dict, key: str, default):
@@ -342,6 +187,7 @@ class Evaluation:
     cost_parts: dict
     price: dict
     grown: float
+    street_low: np.ndarray   # street cooling at the low end of the published range
 
 
 def evaluate(block: Block, placements: list[dict], years: int = 10, unit_cost: dict | None = None) -> Evaluation:
@@ -377,13 +223,14 @@ def evaluate(block: Block, placements: list[dict], years: int = 10, unit_cost: d
 
     # What the new items add on top of the shade that is already there (inside the box and in the ring around it).
     existing_surface, existing_air = block.existing
-    new_surface = (TYPES["tree"]["cool_c"] * convolve(tree_units, KERNELS["tree"], mode="constant")
-                   + TYPES["cool_roof"]["cool_c"] * convolve(roof_dep, KERNELS["cool_roof"], mode="constant"))
+    tree_surface = TYPES["tree"]["cool_c"] * convolve(tree_units, KERNELS["tree"], mode="constant")
+    roof_spill = TYPES["cool_roof"]["cool_c"] * convolve(roof_dep, KERNELS["cool_roof"], mode="constant")
     new_air = AIR["per_tree_c"] * convolve(tree_units, AIR_KERNEL, mode="constant")
-    street = canopy.marginal(existing_surface, new_surface, COOLING_CAP_C)   # what people feel: shade + roof spill-over
+    street = canopy.marginal(existing_surface, tree_surface + roof_spill, COOLING_CAP_C)   # what people feel: shade + roof spill-over
+    street_low = canopy.marginal(existing_surface * TREE_LOW_SHARE, tree_surface * TREE_LOW_SHARE + roof_spill, COOLING_CAP_C)
     air = canopy.marginal(existing_air, new_air, AIR["cap_c"])                # air temperature: a smaller, wider effect
     surface = street + ROOF_SURFACE_C * roof_dep                              # what the satellite sees: + the roofs themselves
-    return Evaluation(street, air, surface, shaded, trees, roof_m2, stops, crown_m2_grown, co2_kg, by_species, cost_parts, price, grown)
+    return Evaluation(street, air, surface, shaded, trees, roof_m2, stops, crown_m2_grown, co2_kg, by_species, cost_parts, price, grown, street_low)
 
 
 def simulate(block: Block, placements: list[dict], years: int = 10, unit_cost: dict | None = None) -> dict:
@@ -404,6 +251,9 @@ def simulate(block: Block, placements: list[dict], years: int = 10, unit_cost: d
     exposed_after = (out & (after >= hot) & ~shaded).sum()
 
     temp_drop = float(street[out].mean())  # headline: average over streets, parks and open ground
+    low = ev.street_low
+    low_drop = float(low[out].mean())
+    exposed_after_low = (out & (block.lst - low >= hot) & ~shaded).sum()
 
     def near(lm):  # street cooling within LANDMARK_RADIUS of a landmark, outdoor cells only
         win = (slice(max(lm["row"] - LANDMARK_RADIUS, 0), lm["row"] + LANDMARK_RADIUS + 1),
@@ -425,6 +275,14 @@ def simulate(block: Block, placements: list[dict], years: int = 10, unit_cost: d
             "total_cost_inr": round(cost),
             "cost_per_degree_inr": round(cost / temp_drop) if temp_drop > 1e-6 else None,
             "landmark_cooling_c": {lm["name"]: near(lm) for lm in block.meta.get("landmarks", [])},
+            # the same headline figures at the low end of the published range (see TREE_LOW_SHARE)
+            "low_estimate": {
+                "temp_reduction_c": round(low_drop, 3),
+                "peak_reduction_c": round(float(low[out].max()), 2),
+                "heat_exposure_pct": round(float(100 * exposed_after_low / out.sum()), 1),
+                "heat_exposure_reduction_pct": round(float(100 * (exposed_before - exposed_after_low) / exposed_before), 1),
+                "cost_per_degree_inr": round(cost / low_drop) if low_drop > 1e-6 else None,
+            },
         },
         "cooling_grid": np.round(surface, 2).tolist(),  # the map shows surfaces, so painted roofs visibly cool
         # the inputs behind each metric, so the app can show "how this was calculated" with real numbers
@@ -435,7 +293,7 @@ def simulate(block: Block, placements: list[dict], years: int = 10, unit_cost: d
             "aq_gain_pct": round(aqi_gain * 100, 4), "nowak_gain_pct": NOWAK_AQ_GAIN * 100, "nowak_canopy_pct": NOWAK_CANOPY * 100,
             "baseline_aqi": block.meta.get("baseline_aqi"), "growth_tau": GROWTH_TAU_YEARS,
             "cells": int(street.size), "cell_m": block.meta["cell_m"], "roof_surface_c": ROOF_SURFACE_C,
-            "tree_cool_c": TYPES["tree"]["cool_c"], "tree_reach_m": round(TYPES["tree"]["sigma"] * 3 * block.meta["cell_m"]),
+            "tree_cool_c": TYPES["tree"]["cool_c"], "tree_cool_c_low": TYPES["tree"]["cool_c_low"], "tree_reach_m": round(TYPES["tree"]["sigma"] * 3 * block.meta["cell_m"]),
             "roof_cool_c": TYPES["cool_roof"]["cool_c"], "cap_c": COOLING_CAP_C, "air_cap_c": AIR["cap_c"],
             "tree_co2_kg": TREE_CO2_KG_YR,
             "existing_tree_equivalents": round(float(block.existing_equiv.sum())),

@@ -10,8 +10,3 @@ const cut = (n, i) => { const x = (n * i) / 3, f = Math.floor(x), d = x - f; ret
 export function zoneBounds(rows, cols) {
   return Object.fromEntries(ZONES.map((z, i) => [z, [cut(rows, Math.floor(i / 3)), cut(rows, Math.floor(i / 3) + 1), cut(cols, i % 3), cut(cols, (i % 3) + 1)]]));
 }
-
-export function zoneOf(row, col, rows, cols) {
-  for (const [z, [r0, r1, c0, c1]] of Object.entries(zoneBounds(rows, cols))) if (row >= r0 && row < r1 && col >= c0 && col < c1) return z;
-  return 'C';
-}

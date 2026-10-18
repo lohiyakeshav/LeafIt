@@ -14,9 +14,10 @@ from tests.test_shade_and_rules import COLS, ROWS, blk
 
 
 def shaded_block() -> Block:
-    """A mostly-shaded area with one clear patch: naive planting here wastes trees; planting in the patch does not."""
-    canopy = np.full((ROWS, COLS), 0.55)
-    canopy[20:30, 20:30] = 0.0
+    """Dense canopy with plantable gaps and one clear patch: naive planting squeezes trees between crowns; the patch does not."""
+    canopy = np.full((ROWS, COLS), 0.9)
+    canopy[::3, :] = 0.5                 # plantable strips (below the 60% limit) hemmed in by dense shade
+    canopy[20:26, 20:26] = 0.0
     return blk(canopy_frac=canopy.tolist(), canopy_h=np.full((ROWS, COLS), 9.0).tolist())
 
 

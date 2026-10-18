@@ -97,8 +97,6 @@ export function withoutNearest(items, x, z, radius, cellM) {
   return best < 0 ? items : items.filter((_, i) => i !== best);
 }
 
-export const countItems = (items) => items.length;
-
 /** Mature crown area (m²) the placed trees will cover in each cell, for the humid-climate airflow rule. `extra` are trees about to be added. */
 const crownCache = new WeakMap();   // items array -> its crowns: hovering re-checks the same plan many times
 /** plannedCrownM2 for `items` alone, computed once per plan array (plans are immutable: every edit makes a new array). */

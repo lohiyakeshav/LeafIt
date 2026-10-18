@@ -10,7 +10,7 @@ from app.config import BLOCKS_DIR
 from app.domain import optimise as opt
 from app.domain import plantable
 from app.domain import species as species_mod
-from app.domain.sim import Block, evaluate, simulate
+from app.domain.sim import AIR, AIR_KERNEL, COOLING_CAP_C, KERNELS, TREE_LOW_SHARE, TYPES, Block, evaluate, simulate
 
 # The real sample with its v2 layers taken off: each test then adds exactly the canopy, ring, roads or people it is about, so
 # the effect under test isn't mixed with the sample's own (the real heat, buildings and land cover stay).
@@ -102,7 +102,9 @@ def test_a_park_just_outside_the_box_lowers_the_value_of_trees_at_the_edge():
 
 def test_without_existing_shade_the_marginal_formula_is_the_original_curve():
     ev = evaluate(blk(), [{"type": "tree", "row": 5, "col": 5, "count": 2}], 10)
-    assert ev.street.max() > 0 and abs(ev.street.max() - 3.0 * (1 - np.exp(-0.35 * 2 * 0.57 / 3.0))) < 0.01
+    k0 = KERNELS["tree"][KERNELS["tree"].shape[0] // 2, KERNELS["tree"].shape[1] // 2]   # the tree's own cell's share
+    raw = TYPES["tree"]["cool_c"] * 2 * 0.5654 * k0
+    assert ev.street.max() > 0 and abs(ev.street.max() - COOLING_CAP_C * (1 - np.exp(-raw / COOLING_CAP_C))) < 1e-3
 
 
 # ── air cooling ──────────────────────────────────────────────────────────────────────────────────
@@ -112,17 +114,20 @@ def test_air_cools_less_than_the_surface_and_never_exceeds_its_cap(cells):
         assert 0 < ev.air.max() < 1.5 and ev.air.mean() < ev.street.mean()
 
 
-def test_street_trees_8_m_apart_give_air_cooling_of_0_4_to_0_8_c():
-    """The calibration the air curve is built around: a typical street (trees about 8 m apart) cools its air by 0.4–0.8 °C."""
-    rows = cols = 41
-    b = Block.from_dict({**RAW, "rows": rows, "cols": cols, "lst_c": grid(42, rows, cols).tolist(),
-                         "landcover": grid(3, rows, cols).astype(int).tolist(), "building_frac": grid(0, rows, cols).tolist(),
-                         "roof_area_m2": grid(0, rows, cols).tolist(), "canopy_frac": grid(0, rows, cols).tolist(),
-                         "canopy_h": grid(0, rows, cols).tolist(), "carriageway_frac": grid(0, rows, cols).tolist(), "landmarks": []})
-    pattern = [1, 1, 1, 2]                                   # 5 trees per 40 m: one every 8 m
-    line = [{"type": "tree", "row": 20, "col": c, "count": pattern[c % 4]} for c in range(41)]
-    mid = evaluate(b, line, 30).air[20, 15:26].mean()
-    assert 0.4 <= mid <= 0.8, mid
+def test_calibration_matches_the_cited_studies():
+    """Uniform canopy, far from the edges: the numbers the Method page cites must come out of the model."""
+    from scipy.ndimage import convolve
+
+    from app.domain import canopy
+    def centre(per_tree, kernel, cap, cover):            # cover = share of each 10 m cell under 50 m² crowns
+        units = np.full((41, 41), cover * 2)
+        return canopy.marginal(0, per_tree * convolve(units, kernel, mode="constant")[20, 20], cap)
+    high = lambda cover: centre(TYPES["tree"]["cool_c"], KERNELS["tree"], COOLING_CAP_C, cover)
+    low = lambda cover: centre(TYPES["tree"]["cool_c"] * TREE_LOW_SHARE, KERNELS["tree"], COOLING_CAP_C, cover)
+    air = lambda cover: centre(AIR["per_tree_c"], AIR_KERNEL, AIR["cap_c"], cover)
+    assert abs(low(0.5) - 0.268) < 0.015                 # Ruiz-Valero et al. 2026: half canopy → 0.268 °C surface
+    assert 1.0 < high(0.5) < 2.0 and high(1.0) < 4.0     # Schwaab et al. 2021: tree vs built-up surfaces 0–4 °C (southern Europe)
+    assert abs(air(1.0) - 1.0) < 0.05                    # Bowler et al. 2010: parks ~1 °C cooler air
 
 
 # ── where trees may go: one reason, in a fixed order ────────────────────────────────────────────

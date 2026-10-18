@@ -14,6 +14,8 @@ from app.domain.sim import Block, simulate
 LOW_VALUE_LIMIT = 0.10        # a plan with more than this share of low-value trees is sent back
 HOT_ZONE_ABOVE_C = 1.0        # a zone this much hotter than the outdoor average counts as a hot zone
 VULNERABLE_ZONE_SHARE = 0.15  # a zone holding at least this share of vulnerable residents deserves attention
+MONOCULTURE_SHARE = optimise.MAX_SPECIES_SHARE   # one species above the planner's own mix target is flagged
+LOW_BUDGET_USE_PCT = 60       # below this share of the budget spent, the check explains why more could not be placed
 
 
 def check_plan(block: Block, placements: list[dict], years: int, unit_cost: dict | None, budget: float) -> dict:
@@ -63,9 +65,6 @@ def check_plan(block: Block, placements: list[dict], years: int, unit_cost: dict
     return report
 
 
-MONOCULTURE_SHARE = 0.6   # one species above this share of a plan is flagged: a single pest or disease could take most of it
-
-
 def advice(r: dict) -> list[str]:
     """What to fix, in words the model can act on (and a person can read)."""
     out = []
@@ -78,6 +77,20 @@ def advice(r: dict) -> list[str]:
         out.append(f"Zones with many vulnerable residents and nothing planned: {', '.join(r['vulnerable_zones_untouched'])}.")
     if r["trees"] >= 20 and r["dominant_species_share"] > MONOCULTURE_SHARE:
         out.append(f"{round(100 * r['dominant_species_share'])}% of the trees are one species: mention that mixing species would protect against pests and disease.")
-    if r["budget_used_pct"] is not None and r["budget_used_pct"] < 60:
+    if r["budget_used_pct"] is not None and r["budget_used_pct"] < LOW_BUDGET_USE_PCT:
         out.append(f"Only {r['budget_used_pct']}% of the budget is used: little more can be placed under the rules (capacity, shade, airflow).")
     return out
+
+
+# The thresholds above, for the Method page (GET /assumptions).
+ASSUMPTION = {
+    "item": "How the AI's plans are checked",
+    "value": f"A tree is low value below {optimise.LOW_VALUE_BELOW:.0%} of its bare-ground effect; a plan with more than "
+             f"{LOW_VALUE_LIMIT:.0%} low-value trees cannot be recommended",
+    "status": "modelling choice",
+    "why": f"Code, not the model, checks every plan Gemini proposes. It also flags zones {HOT_ZONE_ABOVE_C:g} °C hotter than the outdoor "
+           f"average with nothing planned, zones holding {VULNERABLE_ZONE_SHARE:.0%} or more of the vulnerable residents with nothing "
+           f"planned, any species above {MONOCULTURE_SHARE:.0%} of the trees, and a budget less than {LOW_BUDGET_USE_PCT}% used. "
+           "Only the low-value rule refuses a plan; the rest is advice Gemini must address.",
+    "sources": [],
+}

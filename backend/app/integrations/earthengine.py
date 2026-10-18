@@ -19,13 +19,12 @@ from scipy.ndimage import gaussian_filter
 
 from app import config
 from app.config import MODEL
-from app.domain.area.buildings import parse_features
+from app.domain.area.buildings import CONFIDENCE_MIN, parse_features
 from app.domain.area.climate import hot_months  # noqa: F401 - re-exported: the season used for the heat baseline
 from app.domain.area.grid import Bounds, Grid, make_grid
 
 log = logging.getLogger("leafit.ee")
 
-CONFIDENCE_MIN = 0.75
 TILE_M = 500        # buildings are queried in ~500 m tiles: one query may not return more than 5000 features
 HEIGHT_CELL_M = 4   # Open Buildings 2.5D Temporal is a 4 m raster
 RING_CELLS = round(MODEL["ring_m"] / MODEL["area"]["cell_m"])   # the ring of surroundings, in cells (150 m → 15)

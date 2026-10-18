@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { fromDisplay, inr, setDisplayCurrency, toDisplay } from './format.js';
+import { degRange, fromDisplay, inr, setDisplayCurrency, toDisplay } from './format.js';
+
+describe('cooling range', () => {
+  it('shows low to high, or one value when they match or nothing cools', () => {
+    expect(degRange({ temp_reduction_c: 0.151, low_estimate: { temp_reduction_c: 0.025 } }, 'temp_reduction_c')).toBe('−0.03 to −0.15°');
+    expect(degRange({ temp_reduction_c: 0.15 }, 'temp_reduction_c')).toBe('−0.15°');
+    expect(degRange({ temp_reduction_c: 0, low_estimate: { temp_reduction_c: 0 } }, 'temp_reduction_c')).toBe('0.00°');
+  });
+});
 
 describe('display currency', () => {
   afterEach(() => setDisplayCurrency('INR', 1));

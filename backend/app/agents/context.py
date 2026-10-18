@@ -19,10 +19,6 @@ CANOPY_CELL = 0.3              # a cell counts as canopy-covered from this share
 WORLDCOVER = {"trees": 10, "water": 80, "built": 50}
 
 
-def _xz_to_cell(x: float, z: float, cell_m: float) -> tuple[int, int]:
-    return int(z // cell_m), int(x // cell_m)
-
-
 def _round(x, n=1):
     return None if x is None else round(float(x), n)
 

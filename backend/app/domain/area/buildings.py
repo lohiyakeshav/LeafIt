@@ -7,6 +7,7 @@ import numpy as np
 from app.domain.area.grid import Grid
 
 DEFAULT_HEIGHT_M = 6.0   # used where the height raster has no value (about two storeys)
+CONFIDENCE_MIN = 0.75    # Open Buildings footprints below this detection confidence are left out
 MIN_HEIGHT_M, MAX_HEIGHT_M = 3.0, 80.0
 SUPERSAMPLE = 8          # each 10 m cell is sampled on an 8×8 grid of points (1.25 m apart)
 

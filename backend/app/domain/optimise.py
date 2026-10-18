@@ -20,6 +20,10 @@ MAX_STEPS = 3000
 FOCUS_RADIUS_CELLS = 8   # ~80 m around a landmark the user cares about
 FOCUS_BOOST = 4
 ZONE_BOOST = 10          # a focus zone counts this many times more: decisive, so "focus here" really means here first
+FOCUS_FLOOR = 0.1        # near a focus landmark even cool-but-busy places count a little
+PEOPLE_FLOOR = 0.2       # "people" goal: every outdoor cell keeps this weight, plus residents nearby ...
+POI_BOOST = 2            # ... and up to this much more beside schools, clinics, bus stops and markets
+VULNERABLE_FLOOR = 0.05  # "vulnerable" goal: outdoor cells with no vulnerable residents nearby still count a little
 PEOPLE_KINDS = ("school", "clinic", "bus stop", "market")
 POI_SIGMA_CELLS = 5
 LOW_VALUE_BELOW = 0.5    # a tree is "low value" if it adds less than half of what it would on bare ground
@@ -58,15 +62,15 @@ def weights(block: Block, goal: str, focus=(), focus_zones=(), avoid_zones=()) -
     elif goal in ("people", "vulnerable"):
         expo = block.exposure if block.exposure is not None and block.exposure.max() > 0 else None
         if goal == "vulnerable" and expo is not None:
-            w = out * (0.05 + expo / expo.max())
+            w = out * (VULNERABLE_FLOOR + expo / expo.max())
         else:
-            w = out * (0.2 + (expo / expo.max() if expo is not None else 0.0)) * (1 + 2 * _poi(block))
+            w = out * (PEOPLE_FLOOR + (expo / expo.max() if expo is not None else 0.0)) * (1 + POI_BOOST * _poi(block))
     else:                    # "average": street-level cooling where people are
         w = out.astype(float)
     if focus:
         y, x = np.indices((rows, cols))
         near = sum(np.exp(-((y - r) ** 2 + (x - c) ** 2) / (2 * FOCUS_RADIUS_CELLS ** 2)) for r, c in focus)
-        w = (w + 0.1) * (1 + FOCUS_BOOST * near)  # +0.1 so cool-but-busy places near a landmark still count
+        w = (w + FOCUS_FLOOR) * (1 + FOCUS_BOOST * near)
     if focus_zones:
         w = np.where(zones.mask(rows, cols, focus_zones), w * ZONE_BOOST, w)
     if avoid_zones:

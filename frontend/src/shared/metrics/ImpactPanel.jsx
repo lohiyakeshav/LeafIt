@@ -1,13 +1,12 @@
 import { motion } from 'framer-motion';
 import { AnimatedNumber, InfoLabel, LABEL, Spinner } from '../ui';
-import { inr } from '../lib/format.js';
+import { degRange, exposureRange, formatAqi, formatDeg, formatTons, inr, perDegreeRange } from '../lib/format.js';
 
 const n = (src, k) => Number(src?.[k] ?? 0);
 
 // Simulator read-out in three tiers: headline cooling, two supporting heroes,
 // then small print (secondary stats, budget, plan, landmarks).
 const NUM = { fontFamily: 'var(--font-sans)', fontWeight: 600, lineHeight: 1, fontVariantNumeric: 'tabular-nums' };
-const deg = (v, d = 2) => `${Math.abs(v) >= 0.5 * 10 ** -d ? '−' : ''}${Math.abs(v).toFixed(d)}°`;
 
 export function ImpactPanel({ metrics: m, breakdown: b, budget, years, busy, error, compact = false, onInfo, kicker = 'LIVE ESTIMATE' }) {
   const cool = n(m, 'temp_reduction_c'), peak = n(m, 'peak_reduction_c');
@@ -38,10 +37,11 @@ export function ImpactPanel({ metrics: m, breakdown: b, budget, years, busy, err
       {/* Tier 1: the number the plan is judged on */}
       <div {...tap('cooling')}>
         <InfoLabel label="STREET COOLING" onInfo={() => onInfo?.('cooling')} />
-        <AnimatedNumber value={cool} format={v => deg(v)}
-          style={{ ...NUM, display: 'block', marginTop: 10, fontSize: compact ? 48 : 68, letterSpacing: '-0.05em', color: cool > 0.005 ? 'var(--accent)' : 'var(--ink)' }} />
+        <AnimatedNumber value={cool} format={v => degRange({ temp_reduction_c: v, low_estimate: m?.low_estimate }, 'temp_reduction_c')}
+          style={{ ...NUM, display: 'block', marginTop: 10, fontSize: compact ? 32 : 44, letterSpacing: '-0.04em', color: cool > 0.005 ? 'var(--accent)' : 'var(--ink)' }} />
         <div style={{ marginTop: 10, fontSize: 13.5, color: 'var(--ink-soft)' }}>
-          Average over streets and open ground · hottest spot <span style={{ color: peak > 0.05 ? 'var(--cool)' : 'var(--ink-soft)', fontFamily: 'var(--font-mono)' }}>{deg(peak, 1)}</span>
+          Average over streets and open ground · hottest spot <span style={{ color: peak > 0.05 ? 'var(--cool)' : 'var(--ink-soft)', fontFamily: 'var(--font-mono)' }}>{degRange(m, 'peak_reduction_c', 1)}</span>
+          <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>Low to high: published studies of tree cooling differ</div>
         </div>
       </div>
 
@@ -49,13 +49,13 @@ export function ImpactPanel({ metrics: m, breakdown: b, budget, years, busy, err
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <div {...tap('aqi')}>
           <InfoLabel label="AIR QUALITY" onInfo={() => onInfo?.('aqi')} />
-          <AnimatedNumber value={aqi} format={v => b?.baseline_aqi == null ? '—' : Math.abs(v) < 0.005 ? '0.00' : `−${Math.abs(v).toFixed(2)}`}
+          <AnimatedNumber value={aqi} format={v => b?.baseline_aqi == null ? '—' : formatAqi(v)}
             style={{ ...NUM, display: 'block', marginTop: 8, fontSize: compact ? 26 : 32, letterSpacing: '-0.04em', color: aqi < -0.005 ? 'var(--accent)' : 'var(--ink)' }} />
           <div style={{ marginTop: 6, fontSize: 12.5, color: 'var(--muted)' }}>{b?.baseline_aqi == null ? 'no AQI reading for this area' : 'AQI points'}</div>
         </div>
         <div {...tap('co2')}>
           <InfoLabel label="CO₂ CAPTURED" onInfo={() => onInfo?.('co2')} />
-          <AnimatedNumber value={co2} format={v => `${(v / 1000).toFixed(1)} t`}
+          <AnimatedNumber value={co2} format={formatTons}
             style={{ ...NUM, display: 'block', marginTop: 8, fontSize: compact ? 26 : 32, letterSpacing: '-0.04em' }} />
           <div style={{ marginTop: 6, fontSize: 12.5, color: 'var(--muted)' }}>per year</div>
         </div>
@@ -64,10 +64,10 @@ export function ImpactPanel({ metrics: m, breakdown: b, budget, years, busy, err
       {/* Tier 3: small print */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, paddingTop: 20, borderTop: '1px solid var(--rule)' }}>
         {[
-          ['exposure', 'STILL TOO HOT', `${Math.round(n(m, 'heat_exposure_pct'))}% of outdoors`],
-          ['air', 'AIR COOLING', `${deg(n(m, 'air_reduction_c'))} at head height`],
-          ['equity', 'FOR VULNERABLE RESIDENTS', m?.equity_cooling_c == null ? 'no population data' : `${deg(n(m, 'equity_cooling_c'))} in the most exposed areas`],
-          ['per_degree', 'COST PER °C', m?.cost_per_degree_inr == null ? '—' : inr(n(m, 'cost_per_degree_inr'))],
+          ['exposure', 'STILL TOO HOT', `${exposureRange(m)} of outdoors`],
+          ['air', 'AIR COOLING', `${formatDeg(n(m, 'air_reduction_c'))} at head height`],
+          ['equity', 'FOR VULNERABLE RESIDENTS', m?.equity_cooling_c == null ? 'no population data' : `${formatDeg(n(m, 'equity_cooling_c'))} in the most exposed areas (high end)`],
+          ['per_degree', 'COST PER °C', perDegreeRange(m, inr)],
         ].map(([key, label, val]) => (
           <div key={key} {...tap(key)}>
             <InfoLabel label={label} onInfo={() => onInfo?.(key)} />
@@ -102,7 +102,7 @@ export function ImpactPanel({ metrics: m, breakdown: b, budget, years, busy, err
       ]} />
 
       {landmarks.length > 0 && (
-        <SmallTable title="COOLING AT LANDMARKS" rows={landmarks.map(([name, c]) => [name, '', deg(c)])} />
+        <SmallTable title="COOLING AT LANDMARKS · HIGH END" rows={landmarks.map(([name, c]) => [name, '', formatDeg(c)])} />
       )}
     </div>
   );

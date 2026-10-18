@@ -57,7 +57,3 @@ def capacity(sp: dict, free_m2: float | np.ndarray, cell_m: float):
 def suits(sp: dict, climate_class: str | None) -> bool:
     return climate_class is None or climate_class in sp["climates"]
 
-
-def public() -> dict:
-    """The catalogue as served to the web app (GET /species)."""
-    return SPECIES

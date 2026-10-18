@@ -12,7 +12,7 @@ import { Dialog, Reveal, Pill, Spinner, ThemeToggle, useToast } from '../../shar
 import AppBar from '../../shared/layout/AppBar.jsx';
 import { Card } from '../../shared/layout/Card.jsx';
 import { useWide } from '../../shared/layout/useWide.js';
-import { inr, displayCurrency } from '../../shared/lib/format.js';
+import { degRange, displayCurrency, exposureRange, formatTons, inr, perDegreeRange } from '../../shared/lib/format.js';
 import { flattenGrid } from '../../shared/heatmap/draw.js';
 
 
@@ -117,15 +117,14 @@ export default function SummaryPage() {
   const unitCost = breakdown?.unit_cost ?? {}, costParts = breakdown?.cost_parts ?? {};
   const pad = wide ? '0 40px' : '0 var(--gutter)';
   const m = metrics ?? {};
-  const deg = (v, d = 2) => { const x = Math.abs(Number(v ?? 0)); return `${x >= 0.5 * 10 ** -d ? '−' : ''}${x.toFixed(d)}°`; };
 
   const kpis = [
-    ['cooling', 'Street cooling', deg(m.temp_reduction_c), 'average'],
-    ['cooling', 'Hottest spot', deg(m.peak_reduction_c, 1), 'most cooled'],
-    ['co2', 'CO₂ captured', `${(Number(m.co2_captured_kg_per_year ?? 0) / 1000).toFixed(1)} t`, 'per year'],
-    ['exposure', 'Still too hot', `${Math.round(Number(m.heat_exposure_pct ?? 0))}%`, 'of outdoors'],
+    ['cooling', 'Street cooling', degRange(m, 'temp_reduction_c'), 'average, low to high'],
+    ['cooling', 'Hottest spot', degRange(m, 'peak_reduction_c', 1), 'most cooled'],
+    ['co2', 'CO₂ captured', formatTons(m.co2_captured_kg_per_year), 'per year'],
+    ['exposure', 'Still too hot', exposureRange(m), 'of outdoors'],
     ['cost', 'Total cost', inr(Number(m.total_cost_inr ?? 0)), Number(m.total_cost_inr ?? 0) > budget ? `over ${inr(budget)} budget` : `of ${inr(budget)} budget`],
-    ['per_degree', 'Cost per °C', m.cost_per_degree_inr == null ? '—' : inr(Number(m.cost_per_degree_inr)), 'value for money'],
+    ['per_degree', 'Cost per °C', perDegreeRange(m, inr), 'value for money'],
   ];
 
   const step = (n, title, done, active, body) => (

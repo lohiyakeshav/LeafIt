@@ -1,11 +1,10 @@
 // The Studio: place trees, cool roofs and shaded bus stops on the 3D twin and watch the live estimate.
 // This file owns the page's state and rules (what may go where); presentation pieces live in ./components.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { ArrowLeft, RotateCcw, Undo2, ArrowRight, Sparkles, Brush, Info } from 'lucide-react';
-import { inr } from '../../shared/lib/format.js';
-import { decodePlan } from '../../shared/lib/share.js';
+import { degRange, inr } from '../../shared/lib/format.js';
 import HeatGrid from '../../shared/heatmap/HeatGrid.jsx';
 import { ImpactPanel } from '../../shared/metrics/ImpactPanel.jsx';
 import { MetricWhyModal } from '../../shared/metrics/MetricWhyModal.jsx';
@@ -14,7 +13,7 @@ import { useBlock } from '../../api/useBlock.js';
 import { endpoints } from '../../api/endpoints.js';
 import { useSession } from '../../state/session.js';
 import { toGrid } from '../../model/grid.js';
-import { SPECIES_BY_ID, crownM2, humidViolationAt, speciesOf, whyNot } from '../../model/rules.js';
+import { crownM2, humidViolationAt, speciesOf, whyNot } from '../../model/rules.js';
 import { ZONE_LABELS } from '../../model/zones.js';
 import { AUTO, autoSpecies } from '../../model/species.js';
 import { useSimulation } from '../../model/useSimulation.js';
@@ -71,21 +70,6 @@ export default function StudioPage() {
   const ready = Boolean(block) && storeBlockId === id;
 
   const grid = useMemo(() => (block ? toGrid(block) : null), [block]);
-
-  // A shared link carries the plan in ?plan=…: place it once the area is ready, then tidy the URL.
-  const [params, setParams] = useSearchParams();
-  useEffect(() => {
-    const code = params.get('plan');
-    if (!ready || !grid || !code) return;
-    decodePlan(code).then((d) => {
-      if (d) {
-        setItems(d.packed.map(([k, a, b, sp]) => (k === 'r' ? roofItem(b, a) : k === 't' ? treeItem(a, b, grid.cellM, SPECIES_BY_ID[sp] ? sp : null) : stopItem(a, b, grid.cellM))));
-        if (d.years) setYears(d.years);
-        toast('Shared plan loaded');
-      } else toast('That share link is damaged');
-      setParams({}, { replace: true });
-    });
-  }, [ready, grid]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const cellPlacements = useMemo(() => (ready ? toCellPlacements(items) : []), [ready, items]);
   const sim = useSimulation(ready ? block : null, cellPlacements, years, userPrices);
@@ -400,7 +384,7 @@ export default function StudioPage() {
           {/* Dock: live read-out + tools + AI, always reachable */}
           <div style={{ borderTop: '1px solid var(--rule)', background: 'var(--page)', padding: '10px 12px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr) auto', gap: 6 }}>
             <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', gap: 12, padding: '0 4px 2px', fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--muted)' }}>
-              <span>COOLING <span style={{ color: 'var(--accent)' }}>{(() => { const c = Number(sim.metrics?.temp_reduction_c ?? 0); return `${c >= 0.005 ? '−' : ''}${c.toFixed(2)}°`; })()}</span></span>
+              <span>COOLING <span style={{ color: 'var(--accent)' }}>{degRange(sim.metrics, 'temp_reduction_c')}</span></span>
               <span style={{ color: totalCost > budget ? 'var(--warn)' : 'var(--muted)' }}>{inr(totalCost)} of {inr(budget)} · {totalCost > budget ? `${inr(totalCost - budget)} over` : `${inr(budget - totalCost)} left`}</span>
             </div>
             {toolCards}

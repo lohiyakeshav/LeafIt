@@ -4,7 +4,7 @@ import { toGrid } from './grid.js';
 import { capacityOf, crownRatio, freeM2, speciesMaturity, suits } from './rules.js';
 import { fromCellPlacements, toCellPlacements, treeItem } from './placements.js';
 import { AUTO, SPECIES_LIST, autoSpecies, speciesOptions } from './species.js';
-import { ZONES, zoneBounds, zoneOf } from './zones.js';
+import { ZONES, zoneBounds } from './zones.js';
 
 const root = new URL('../../../', import.meta.url);
 const raw = JSON.parse(readFileSync(new URL('backend/data/blocks/lajpat_nagar.json', root), 'utf8'));
@@ -16,16 +16,15 @@ describe('zones (must equal the Python zones)', () => {
     expect(b.NW).toEqual([0, 20, 0, 20]);
     expect(b.SE).toEqual([40, 60, 40, 60]);
     expect(b.C).toEqual([20, 40, 20, 40]);
-    const seen = new Set();
-    for (let r = 0; r < 60; r++) for (let c = 0; c < 60; c++) seen.add(zoneOf(r, c, 60, 60));
-    expect(new Set(seen)).toEqual(new Set(ZONES));
+    const area = Object.values(b).reduce((sum, [r0, r1, c0, c1]) => sum + (r1 - r0) * (c1 - c0), 0);
+    expect(Object.keys(b)).toEqual(ZONES);
+    expect(area).toBe(60 * 60);   // the nine zones tile the grid exactly
   });
 
   it('rounds uneven sizes the same way numpy does (half to even)', () => {
     // numpy.linspace(0, 70, 4).round() -> [0, 23, 47, 70]; linspace(0, 100, 4).round() -> [0, 33, 67, 100]
     expect(zoneBounds(70, 100).NW).toEqual([0, 23, 0, 33]);
     expect(zoneBounds(70, 100).SE).toEqual([47, 70, 67, 100]);
-    expect(zoneOf(69, 99, 70, 100)).toBe('SE');
   });
 });
 

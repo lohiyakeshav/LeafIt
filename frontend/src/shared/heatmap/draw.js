@@ -19,11 +19,6 @@ export function heatColor(t) {
   ];
 }
 
-export function heatColorCss(t) {
-  const [r, g, b] = heatColor(t);
-  return `rgb(${r},${g},${b})`;
-}
-
 export function parseBlock(json) {
   if (!json) return null;
   const lst = json.lst ?? json.lst_c ?? [];

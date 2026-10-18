@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, CheckCircle, AlertCircle, ChevronDown } from 'lucide-react';
 import { endpoints } from '../../api/endpoints.js';
-import { inr, displayCurrency, toDisplay, fromDisplay } from '../../shared/lib/format.js';
+import { degRange, formatDeg, inr, displayCurrency, toDisplay, fromDisplay } from '../../shared/lib/format.js';
 import { prices } from '../../model/sim.js';
 import { budgetProblem } from './budget.js';
 import { PlanBreakdown } from './components/PlanBreakdown.jsx';
@@ -332,7 +332,7 @@ function ScenarioCard({ sc, pick, selected, onSelect }) {
             {sc.label}{pick && <span style={{ marginLeft: 8, fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--accent)' }}>GEMINI'S PICK</span>}
           </div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-            −{m.temp_reduction_c}° avg · −{m.peak_reduction_c}° peak · {inr(m.total_cost_inr)}
+            {degRange(m, 'temp_reduction_c')} avg · {degRange(m, 'peak_reduction_c')} peak · {inr(m.total_cost_inr)}
           </div>
         </div>
         <motion.div animate={{ scale: selected ? 1 : 0 }} transition={{ type: 'spring', damping: 12 }}>
@@ -348,7 +348,7 @@ function PlanChecks({ checks: c }) {
   const rows = [
     ['Budget used', c.budget_used_pct == null ? null : `${c.budget_used_pct}%`],
     ['Trees on already-shaded ground', c.trees ? `${Math.round((c.low_value_tree_ratio ?? 0) * 100)}%` : null],
-    ['Cooling for vulnerable residents', c.equity_cooling_c == null ? null : `${Math.abs(c.equity_cooling_c) >= 0.005 ? '−' : ''}${Math.abs(c.equity_cooling_c).toFixed(2)}°`],
+    ['Cooling for vulnerable residents', c.equity_cooling_c == null ? null : formatDeg(c.equity_cooling_c)],
     ['New cool roofs', c.cool_roofs ? `${c.cool_roofs}${c.residents_under_cool_roofs == null ? '' : ` · ${c.residents_under_cool_roofs.toLocaleString()} residents below`}` : null],
     ['Shaded bus stops', c.shade_stops ? `${c.shade_stops}${c.bus_stops_sheltered?.length ? ` (at ${c.bus_stops_sheltered.join(', ')})` : ''}` : null],
   ].filter(([, v]) => v != null);

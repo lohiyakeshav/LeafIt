@@ -26,7 +26,7 @@ from app.integrations.gemini import PLANNER_MODEL, PLANNER_THINKING, DailyLimitR
 MAX_TURNS = 16
 MAX_REVISIONS = 2     # a plan refused for wasting trees may be redone this many times; after that the best checked plan wins
 GOALS = ("average", "hotspots", "people", "vulnerable")
-INDOOR_C_RANGE = MODEL["roof"]["indoor_c_range"]
+INDOOR_C = MODEL["roof"]["indoor_c"]
 
 SYSTEM = """You are LeafIt's urban-heat planner for Indian neighbourhoods. The user gives a brief and a budget. You are shown a
 heat map and a canopy map of the area (the same 3x3 zones NW N NE / W C E / SW S SE as the tools) and can read a place brief.
@@ -58,8 +58,9 @@ How to plan well:
   cool roofs, and leave room for air to move (the simulator enforces a density limit there).
 - Judge plans by cost per degree and by who benefits, not only by the average.
 - Always name zones, roads and landmarks. Say what you could not know (data_quality in the brief).
-temp_reduction_c is street-level surface cooling (what people feel outdoors on the ground); air_reduction_c is the smaller
-air-temperature effect; equity_cooling_c is the cooling where vulnerable residents live (absent without population data).
+temp_reduction_c is street-level surface cooling (what people feel outdoors on the ground) at the high end of the published range;
+low_estimate holds the low end of it, of peak_reduction_c and of heat exposure: always quote these as a range (low to high), never
+the high end alone. Compare plans on the high end. air_reduction_c is the air-temperature effect; equity_cooling_c is the cooling where vulnerable residents live (absent without population data).
 Use ONLY numbers returned by the tools. Never invent or estimate figures. Currency is INR. Reply in English."""
 
 _SCENARIO_PROPS = {
@@ -176,14 +177,14 @@ class Session:
         stops = sum(p["type"] == "shade_stop" for p in plan)
         self.scenarios.append({"id": sid, "label": label, "placements": plan, "metrics": metrics, "goal": goal})
         self.steps.append({"action": f"Simulated {sid}: {label}",
-                           "detail": f"{trees} trees, {roofs} cool roofs{f', {stops} shelters' if stops else ''} → −{metrics['temp_reduction_c']} °C avg, "
+                           "detail": f"{trees} trees, {roofs} cool roofs{f', {stops} shelters' if stops else ''} → −{metrics['low_estimate']['temp_reduction_c']} to −{metrics['temp_reduction_c']} °C avg, "
                                      f"{metrics['heat_exposure_pct']}% outdoor area still exposed"})
         keep = ("temp_reduction_c", "air_reduction_c", "equity_cooling_c", "peak_reduction_c", "heat_exposure_pct", "heat_exposure_reduction_pct",
-                "total_cost_inr", "cost_per_degree_inr", "co2_captured_kg_per_year", "landmark_cooling_c")
+                "total_cost_inr", "cost_per_degree_inr", "co2_captured_kg_per_year", "landmark_cooling_c", "low_estimate")
         rep = checks.check_plan(self.block, plan, self.years, self.unit_cost, self.budget)
         who = {k: rep[k] for k in ("cool_roof_m2", "residents_under_cool_roofs", "vulnerable_under_cool_roofs", "bus_stops_sheltered")}
         if roofs:
-            who["cool_roof_indoor_c_range"] = INDOOR_C_RANGE   # measured in pilots, for context: the simulator does not model rooms
+            who["cool_roof_indoor_c"] = INDOOR_C   # measured in the Hyderabad pilot (NRDC), for context: the simulator does not model rooms
         return {"scenario_id": sid, "trees": trees, "cool_roofs": roofs, "shade_stops": stops, "goal": goal,
                 "focused_on": [n for n in focus_landmarks if n in lms], **{k: metrics[k] for k in keep}, **who}
 

@@ -1,6 +1,6 @@
 import { Plus, X } from 'lucide-react';
 import { LABEL } from '../../../shared/ui';
-import { inr } from '../../../shared/lib/format.js';
+import { degRange, formatDeg, formatTons, inr } from '../../../shared/lib/format.js';
 
 /** Saved plan variants: save the current plan, load one back, compare them all. */
 export function PlanOptions({ options, canSave, onSave, onLoad, onRemove, onCompare }) {
@@ -15,7 +15,7 @@ export function PlanOptions({ options, canSave, onSave, onLoad, onRemove, onComp
           <button onClick={() => onLoad(o)} title={`Load ${o.label}`} style={{ textAlign: 'left', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {o.label} <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--muted)' }}>· {o.items.length} items · yr {o.years}</span>
           </button>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5, color: 'var(--accent)' }}>{fmtDeg(o.metrics?.temp_reduction_c)}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5, color: 'var(--accent)' }}>{degRange(o.metrics, 'temp_reduction_c')}</span>
           <button onClick={() => onRemove(o)} aria-label={`Delete ${o.label}`} title="Delete" style={{ color: 'var(--muted)', padding: 4, lineHeight: 0 }}><X size={14} /></button>
         </div>
       ))}
@@ -27,12 +27,11 @@ export function PlanOptions({ options, canSave, onSave, onLoad, onRemove, onComp
   );
 }
 
-const fmtDeg = (v) => { const x = Math.abs(Number(v ?? 0)); return `${x >= 0.005 ? '−' : ''}${x.toFixed(2)}°`; };
 const ROWS = [
-  ['Street cooling', (m) => m.temp_reduction_c, fmtDeg, 'max'],
-  ['Hottest spot', (m) => m.peak_reduction_c, (v) => fmtDeg(v).replace(/(\.\d)\d/, '$1'), 'max'],
+  ['Street cooling', (m) => m.temp_reduction_c, formatDeg, 'max'],
+  ['Hottest spot', (m) => m.peak_reduction_c, (v) => formatDeg(v, 1), 'max'],
   ['Still too hot', (m) => m.heat_exposure_pct, (v) => `${Math.round(v)}%`, 'min'],
-  ['CO₂ per year', (m) => m.co2_captured_kg_per_year, (v) => `${(v / 1000).toFixed(1)} t`, 'max'],
+  ['CO₂ per year', (m) => m.co2_captured_kg_per_year, formatTons, 'max'],
   ['Cost', (m) => m.total_cost_inr, inr, 'min'],
   ['Cost per °C', (m) => m.cost_per_degree_inr, (v) => (v == null ? '—' : inr(v)), 'min'],
 ];
@@ -72,7 +71,7 @@ export function CompareTable({ options, current }) {
           </tbody>
         </table>
       </div>
-      <p style={{ marginTop: 14, fontSize: 12.5, color: 'var(--muted)' }}>Best value in each row is highlighted. Tap an option in the panel to load it back.</p>
+      <p style={{ marginTop: 14, fontSize: 12.5, color: 'var(--muted)' }}>Best value in each row is highlighted. Cooling figures here are the high end of the published range, so plans compare like for like. Tap an option in the panel to load it back.</p>
     </div>
   );
 }

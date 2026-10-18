@@ -37,10 +37,14 @@ def create_app() -> FastAPI:
         @app.middleware("http")
         async def pages_win_for_browsers(request: Request, call_next):
             # Some page URLs are also API paths (/vendors, /assumptions). A browser loading or reloading the page asks for HTML;
-            # the app's own fetches don't, so they still reach the API.
+            # the app's own fetches don't, so they still reach the API. `Vary: Accept` keeps the browser from answering the
+            # app's fetch with the cached page (one URL, two representations).
             if request.method == "GET" and "text/html" in request.headers.get("accept", "") and "." not in request.url.path.rsplit("/", 1)[-1]:
-                return FileResponse(WEB_DIR / "index.html")
-            return await call_next(request)
+                response = FileResponse(WEB_DIR / "index.html")
+            else:
+                response = await call_next(request)
+            response.headers["Vary"] = ", ".join(v for v in (response.headers.get("Vary"), "Accept") if v)
+            return response
     return app
 
 

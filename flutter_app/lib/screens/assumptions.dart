@@ -33,8 +33,8 @@ class AssumptionsScreen extends StatelessWidget {
                     title: 'How we calculate this.',
                     accent: 'calculate',
                     sub: 'A fast grid model, not a physics simulation. Each 10 m cell starts from its satellite surface temperature; '
-                        'every item cools its own cell and, more weakly, its neighbours. Gemini only picks and explains plans. '
-                        'Every figure comes from this model, and every number below has a source.',
+                        'each item\'s cooling is spread over its own cell and its neighbours. Gemini only picks and explains plans. '
+                        'Every figure comes from this model. Measured values link to their source; design decisions are marked as modelling choices.',
                     size: 38,
                   ),
                   const SizedBox(height: 18),

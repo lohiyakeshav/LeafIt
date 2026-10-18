@@ -113,7 +113,7 @@ def test_pipeline_assembles_a_real_block(fake_earth):
     block_repository.save_area(area)
     block = block_repository.get_block(area["id"])
     out = simulate(block, [{"type": "tree", "row": 0, "col": 0}, {"type": "cool_roof", "row": 10, "col": 4}], 10)
-    assert out["metrics"]["total_cost_inr"] == 3000 + round(float(block.roof_area[10, 4]) * 250) and len(out["cooling_grid"]) == 40
+    assert out["metrics"]["total_cost_inr"] == 3000 + round(float(block.roof_area[10, 4]) * 300) and len(out["cooling_grid"]) == 40
 
 
 # ---- over HTTP -------------------------------------------------------------------------------------------------------

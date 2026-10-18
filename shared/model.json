@@ -3,11 +3,12 @@
   "types": {
     "tree": {
       "cost": 3000,
-      "cool_c": 0.35,
+      "cool_c": 2.0,
+      "cool_c_low": 0.268,
       "sigma": 1.5
     },
     "cool_roof": {
-      "cost": 250,
+      "cost": 300,
       "cool_c": 0.5,
       "sigma": 1.0
     },
@@ -17,22 +18,21 @@
       "sigma": 0
     }
   },
-  "cooling_cap_c": 3.0,
+  "cooling_cap_c": 4.0,
   "roof": {
-    "indoor_c_range": [1.3, 2.0],
-    "indoor_note": "Rooms below a cool roof, measured in Kerala and Hyderabad pilots (NRDC). Context only: not simulated.",
+    "indoor_c": 2.0,
     "albedo_gain": 0.35,
     "sun_w_m2": 800,
     "heat_transfer_w_m2k": 30
   },
   "tree": {
-    "co2_kg_yr": 21.8,
+    "co2_kg_yr": 51.3,
     "growth_tau_years": 12,
     "canopy_m2": 50
   },
   "air_quality": {
     "nowak_gain": 0.0024,
-    "nowak_canopy": 0.48
+    "nowak_canopy": 0.521
   },
   "landmark_radius_cells": 5,
   "hot_percentile": 75,
@@ -72,7 +72,7 @@
   "carriageway_block_from": 0.5,
   "air": {
     "cap_c": 1.5,
-    "per_tree_c": 0.12,
+    "per_tree_c": 0.82,
     "sigma": 2.0
   },
   "ring_m": 150,

@@ -12,6 +12,8 @@ Use ONLY the numbers in the JSON below. Never invent figures. Say clearly that i
 If "place" is present use it: say what the area is like (climate, existing tree cover), name the tree species chosen when the bill of
 materials lists them, and when residents are given say who benefits (and equity_cooling_c if present: cooling where vulnerable people live).
 If "money" is present, quote every amount of money exactly as written there (already converted), never the INR figures.
+Published studies of tree cooling differ, so metrics.low_estimate holds the low end of each cooling figure: always quote street cooling,
+hottest spot and heat exposure as a range from the low_estimate value to the main value, never the main value alone.
 
 JSON:
 """
@@ -33,7 +35,10 @@ def _template(ctx: dict) -> str:
     cur = ctx.get("currency")
     roof_line = f"\n- Painted roofs: surfaces up to {m['roof_surface_reduction_c']} °C cooler" if m.get("roof_surface_reduction_c") else ""
     items = "\n".join(f"- {i['item']}: {i['quantity']:,} {i['unit']}" for i in ctx["bill_of_materials"])
-    per = f"{money(m['cost_per_degree_inr'], cur)} per °C of street-level cooling" if m["cost_per_degree_inr"] else "n/a"
+    lo = m.get("low_estimate") or {}
+    rng = lambda k: f"{lo[k]}–{m[k]}" if k in lo and lo[k] != m[k] else f"{m[k]}"   # low to high end of the published range
+    per_lo = f"–{money(lo['cost_per_degree_inr'], cur)}" if lo.get("cost_per_degree_inr") else ""
+    per = f"{money(m['cost_per_degree_inr'], cur)}{per_lo} per °C of street-level cooling" if m["cost_per_degree_inr"] else "n/a"
     return f"""# Heat-action plan: {ctx['block']}
 
 ## The problem
@@ -43,8 +48,8 @@ Dense, low-shade streets in {ctx['block']} reach high surface temperatures in su
 {items}
 
 ## Expected impact (model estimates, year {ctx['years']})
-- Street-level cooling: {m['temp_reduction_c']} °C on average across streets and open ground; up to {m['peak_reduction_c']} °C at the most improved spots{roof_line}
-- Outdoor area still heat-exposed: {m['heat_exposure_pct']}% ({m['heat_exposure_reduction_pct']}% less than today)
+- Street-level cooling: {rng('temp_reduction_c')} °C on average across streets and open ground; up to {rng('peak_reduction_c')} °C at the most improved spots{roof_line}
+- Outdoor area still heat-exposed: {m['heat_exposure_pct']}–{lo.get('heat_exposure_pct', m['heat_exposure_pct'])}% ({lo.get('heat_exposure_reduction_pct', m['heat_exposure_reduction_pct'])}–{m['heat_exposure_reduction_pct']}% less than today)
 - CO₂ captured: {m['co2_captured_kg_per_year']:,} kg per year
 - Air quality: {m['aqi_change'] if abs(m['aqi_change']) >= 0.05 else 0} AQI points
 
@@ -56,7 +61,7 @@ Dense, low-shade streets in {ctx['block']} reach high surface temperatures in su
 2. Request quotes from shortlisted local vendors through LeafIt.
 3. Plant and install in phases, then track survival and temperatures.
 
-*All impacts are estimates from the LeafIt grid model; see "How we calculate this".*"""
+*All impacts are estimates from the LeafIt grid model. Cooling is shown as a range because published studies differ; see "How we calculate this".*"""
 
 
 def with_money(ctx: dict) -> dict:

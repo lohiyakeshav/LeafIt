@@ -28,6 +28,7 @@ describe('browser simulator matches the Python one', () => {
       if (c.expected.metrics.cost_per_degree_inr === null) expect(out.metrics.cost_per_degree_inr).toBeNull();
       else expect(Math.abs(out.metrics.cost_per_degree_inr / c.expected.metrics.cost_per_degree_inr - 1)).toBeLessThan(0.01);
       for (const [name, v] of Object.entries(c.expected.metrics.landmark_cooling_c)) close(out.metrics.landmark_cooling_c[name], v, 2);
+      for (const [k, d] of [['temp_reduction_c', 3], ['peak_reduction_c', 2], ['heat_exposure_pct', 1]]) close(out.metrics.low_estimate[k], c.expected.metrics.low_estimate[k], d);
       expect(Math.abs(out.cooling.reduce((a, b) => a + b, 0) - c.expected.cooling_sum)).toBeLessThan(0.5);
       expect(Math.abs(Math.max(...out.cooling) - c.expected.cooling_max)).toBeLessThan(0.011);
       for (const [rc, v] of Object.entries(c.expected.cooling_samples)) {

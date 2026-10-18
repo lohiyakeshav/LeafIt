@@ -41,7 +41,7 @@ export default function AssumptionsPage() {
           kicker="Method"
           title="How we calculate this."
           accent="calculate"
-          sub="A fast grid model, not a physics simulation. Each 10 m cell starts from its satellite surface temperature; every item cools its own cell and, more weakly, its neighbours. Gemini only picks and explains plans. Every figure comes from this model, and every number below has a source."
+          sub="A fast grid model, not a physics simulation. Each 10 m cell starts from its satellite surface temperature; each item's cooling is spread over its own cell and its neighbours. Gemini only picks and explains plans: every figure comes from this model. Measured values link to their source; design decisions are marked as modelling choices."
           size={38}
         />
 
@@ -53,9 +53,10 @@ export default function AssumptionsPage() {
               ['CITED', 'a source gives the value'],
               ['DERIVED', 'computed from cited figures'],
               ['ESTIMATE', 'inside a cited range'],
+              ['MODELLING CHOICE', 'a design decision, not a measurement'],
             ].map(([k, d]) => (
               <span key={k} style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--muted)' }}>
-                <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{k}</span> · {d}
+                <span style={{ color: STATUS_COLOR[k.toLowerCase()], fontWeight: 600 }}>{k}</span> · {d}
               </span>
             ))}
           </div>

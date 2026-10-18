@@ -7,6 +7,7 @@ import {
 } from './rules.js';
 
 const CAP = MODEL.cooling_cap_c;
+const LOW_SHARE = TYPES.tree.cool_c_low / TYPES.tree.cool_c;   // low end of the published range (see sim.py TREE_LOW_SHARE)
 const ROOF_SURFACE_C = round((MODEL.roof.albedo_gain * MODEL.roof.sun_w_m2) / MODEL.roof.heat_transfer_w_m2k, 1);
 const { co2_kg_yr: TREE_CO2, canopy_m2: CANOPY_M2 } = MODEL.tree;
 const { nowak_gain: NOWAK_GAIN, nowak_canopy: NOWAK_CANOPY } = MODEL.air_quality;
@@ -19,6 +20,8 @@ function kernel(sigma) {
   const size = 2 * rad + 1;
   const k = new Float64Array(size * size);
   for (let y = -rad; y <= rad; y++) for (let x = -rad; x <= rad; x++) k[(y + rad) * size + x + rad] = Math.exp(-(x * x + y * y) / (2 * sigma * sigma));
+  const sum = k.reduce((a, v) => a + v, 0);
+  for (let i = 0; i < k.length; i++) k[i] /= sum;   // sums to 1, as in the backend: cooling is spread, not multiplied
   return { rad, size, k };
 }
 const KERNELS = Object.fromEntries(Object.entries(TYPES).filter(([, t]) => t.sigma).map(([n, t]) => [n, kernel(t.sigma)]));
@@ -170,15 +173,16 @@ export function simulate(grid, placements, years = 10, unitCost = null) {
   const aqiGain = (NOWAK_GAIN * addedCanopy) / NOWAK_CANOPY;
 
   const ex = existing(grid);
-  const newSurface = new Float64Array(n), newAir = new Float64Array(n);
-  spread(newSurface, treeUnits, rows, cols, KERNELS.tree, TYPES.tree.cool_c);
-  spread(newSurface, roofDep, rows, cols, KERNELS.cool_roof, TYPES.cool_roof.cool_c);
+  const treeSurface = new Float64Array(n), roofSpill = new Float64Array(n), newAir = new Float64Array(n);
+  spread(treeSurface, treeUnits, rows, cols, KERNELS.tree, TYPES.tree.cool_c);
+  spread(roofSpill, roofDep, rows, cols, KERNELS.cool_roof, TYPES.cool_roof.cool_c);
   spread(newAir, treeUnits, rows, cols, AIR_KERNEL, AIR.per_tree_c);
 
-  const street = new Float64Array(n), air = new Float64Array(n), cooling = new Float32Array(n);
+  const street = new Float64Array(n), low = new Float64Array(n), air = new Float64Array(n), cooling = new Float32Array(n);
   let surfaceSum = 0, surfaceMax = -Infinity;
   for (let i = 0; i < n; i++) {
-    street[i] = marginal(ex.surface[i], newSurface[i], CAP);
+    street[i] = marginal(ex.surface[i], treeSurface[i] + roofSpill[i], CAP);
+    low[i] = marginal(ex.surface[i] * LOW_SHARE, treeSurface[i] * LOW_SHARE + roofSpill[i], CAP);
     air[i] = marginal(ex.air[i], newAir[i], AIR.cap_c);
     const surface = street[i] + ROOF_SURFACE_C * roofDep[i];
     cooling[i] = round(surface, 2);
@@ -190,16 +194,18 @@ export function simulate(grid, placements, years = 10, unitCost = null) {
   const outLst = [];
   for (let i = 0; i < n; i++) if (bf[i] < OUTDOOR_BELOW) { outdoor[i] = 1; outLst.push(lst[i]); }
   const hot = percentile(outLst, HOT_PCT);
-  let exposedBefore = 0, exposedAfter = 0, streetSum = 0, streetMax = -Infinity, airSum = 0;
+  let exposedBefore = 0, exposedAfter = 0, exposedAfterLow = 0, streetSum = 0, streetMax = -Infinity, lowSum = 0, lowMax = -Infinity, airSum = 0;
   for (let i = 0; i < n; i++) {
     if (!outdoor[i]) continue;
     if (lst[i] >= hot) exposedBefore++;
     if (lst[i] - street[i] >= hot && !shaded[i]) exposedAfter++;
-    streetSum += street[i]; airSum += air[i];
+    if (lst[i] - low[i] >= hot && !shaded[i]) exposedAfterLow++;
+    streetSum += street[i]; lowSum += low[i]; airSum += air[i];
     if (street[i] > streetMax) streetMax = street[i];
+    if (low[i] > lowMax) lowMax = low[i];
   }
   const outCount = outLst.length;
-  const tempDrop = streetSum / outCount;
+  const tempDrop = streetSum / outCount, lowDrop = lowSum / outCount;
 
   const near = (lm) => {
     let sum = 0, cnt = 0;
@@ -227,6 +233,13 @@ export function simulate(grid, placements, years = 10, unitCost = null) {
       total_cost_inr: round(cost),
       cost_per_degree_inr: tempDrop > 1e-6 ? round(cost / tempDrop) : null,
       landmark_cooling_c: landmarkCooling,
+      low_estimate: {
+        temp_reduction_c: round(lowDrop, 3),
+        peak_reduction_c: round(lowMax, 2),
+        heat_exposure_pct: round((100 * exposedAfterLow) / outCount, 1),
+        heat_exposure_reduction_pct: round((100 * (exposedBefore - exposedAfterLow)) / exposedBefore, 1),
+        cost_per_degree_inr: lowDrop > 1e-6 ? round(cost / lowDrop) : null,
+      },
     },
     cooling,
     breakdown: {
@@ -235,7 +248,7 @@ export function simulate(grid, placements, years = 10, unitCost = null) {
       aq_gain_pct: round(aqiGain * 100, 4), nowak_gain_pct: NOWAK_GAIN * 100, nowak_canopy_pct: NOWAK_CANOPY * 100,
       baseline_aqi: grid.baselineAqi, growth_tau: MODEL.tree.growth_tau_years,
       cells: n, cell_m: cellM, roof_surface_c: ROOF_SURFACE_C,
-      tree_cool_c: TYPES.tree.cool_c, tree_reach_m: round(TYPES.tree.sigma * 3 * cellM),
+      tree_cool_c: TYPES.tree.cool_c, tree_cool_c_low: TYPES.tree.cool_c_low, tree_reach_m: round(TYPES.tree.sigma * 3 * cellM),
       roof_cool_c: TYPES.cool_roof.cool_c, cap_c: CAP, air_cap_c: AIR.cap_c, tree_co2_kg: TREE_CO2,
       existing_tree_equivalents: round(equiv), climate_class: grid.climate,
       hot_threshold_c: round(hot, 1), hot_percentile: HOT_PCT,
