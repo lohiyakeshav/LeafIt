@@ -19,6 +19,11 @@ export function heatColor(t) {
   ];
 }
 
+/** The cooling that paints the "cooled" colour at full strength. Absolute, so 0.1 °C stays faint and only about 2 °C or more is vivid:
+ *  the pictures then agree with the numbers (a scale relative to each plan's own maximum made every cooled cell look dramatic). */
+export const COOL_FULL_C = 2;
+export const coolStrength = (c) => (c <= 0.02 ? 0 : Math.min(1, c / COOL_FULL_C));
+
 export function parseBlock(json) {
   if (!json) return null;
   const lst = json.lst ?? json.lst_c ?? [];

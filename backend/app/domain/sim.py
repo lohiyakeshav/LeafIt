@@ -30,6 +30,7 @@ NOWAK_AQ_GAIN = MODEL["air_quality"]["nowak_gain"]    # best-case citywide PM2.5
 NOWAK_CANOPY = MODEL["air_quality"]["nowak_canopy"]   # ...at roughly this much canopy cover
 RULES = MODEL["placement_rules"]
 LANDMARK_RADIUS = MODEL["landmark_radius_cells"]      # cells (~50 m) averaged for "cooling near the school" etc.
+HOTTEST_PERCENTILE = MODEL["hottest_percentile"]        # "the hottest tenth of the ground" in the before → after table
 HOT_PERCENTILE = MODEL["hot_percentile"]              # outdoor cells above this baseline percentile count as "exposed"
 OUTDOOR_BELOW = MODEL["outdoor_building_frac_below"]
 AIR = MODEL["air"]
@@ -260,6 +261,18 @@ def simulate(block: Block, placements: list[dict], years: int = 10, unit_cost: d
                slice(max(lm["col"] - LANDMARK_RADIUS, 0), lm["col"] + LANDMARK_RADIUS + 1))
         o = out[win]
         return round(float(street[win][o].mean()), 2) if o.any() else 0.0
+
+    def temps(cells):   # mean surface temperature of `cells` today, and with the plan at the high and low end of the published range
+        return {"before": round(float(block.lst[cells].mean()), 2), "after": round(float((block.lst - street)[cells].mean()), 2),
+                "after_low": round(float((block.lst - low)[cells].mean()), 2)}
+
+    def temps_near(lm):
+        win = (slice(max(lm["row"] - LANDMARK_RADIUS, 0), lm["row"] + LANDMARK_RADIUS + 1),
+               slice(max(lm["col"] - LANDMARK_RADIUS, 0), lm["col"] + LANDMARK_RADIUS + 1))
+        cells = np.zeros(out.shape, bool)
+        cells[win] = out[win]
+        return temps(cells) if cells.any() else None
+    hottest = out & (block.lst >= np.percentile(block.lst[out], HOTTEST_PERCENTILE))
     return {
         "metrics": {
             "temp_reduction_c": round(temp_drop, 3),
@@ -275,6 +288,9 @@ def simulate(block: Block, placements: list[dict], years: int = 10, unit_cost: d
             "total_cost_inr": round(cost),
             "cost_per_degree_inr": round(cost / temp_drop) if temp_drop > 1e-6 else None,
             "landmark_cooling_c": {lm["name"]: near(lm) for lm in block.meta.get("landmarks", [])},
+            # ground temperature before → after, in degrees people recognise (the headline cooling is the difference of these)
+            "temps": {"area": temps(out), "hottest": temps(hottest),
+                      "landmarks": {lm["name"]: t for lm in block.meta.get("landmarks", []) if (t := temps_near(lm))}},
             # the same headline figures at the low end of the published range (see TREE_LOW_SHARE)
             "low_estimate": {
                 "temp_reduction_c": round(low_drop, 3),

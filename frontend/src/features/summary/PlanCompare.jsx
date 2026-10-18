@@ -2,7 +2,7 @@
 // "Heat" view: drag the handle — left is today (Landsat), right is with the plan (heat minus the model's cooling, plus a
 // cyan glow scaled to this plan so even small effects show). "Cooling" view: only what the plan changes, in °C.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { heatColor, drawPlacements, HEAT_STOPS } from '../../shared/heatmap/draw.js';
+import { heatColor, drawPlacements, HEAT_STOPS, coolStrength, COOL_FULL_C } from '../../shared/heatmap/draw.js';
 import { PillToggle } from '../../shared/ui';
 import { fetchSatellite, hasMapsKey } from '../../api/mapTiles.js';
 import { paintGround } from '../../shared/heatmap/landcover.js';
@@ -43,8 +43,8 @@ export default function PlanCompare({ block, placements, cooling, years, maxMapH
     return { lo: a, hi: b };
   }, [lst]);
   const maxCool = useMemo(() => (cooling ? Math.max(0, ...cooling) : 0), [cooling]);
-  // Log scale: a coated roof's own surface cools ~9 °C, a street tree ~0.3 °C. On a linear scale the trees vanish.
-  const strength = (c) => (c <= 0.005 || maxCool <= 0.005 ? 0 : Math.min(1, Math.log1p(c / 0.05) / Math.log1p(maxCool / 0.05)));
+  // Absolute scale (see coolStrength): a cell cooled 0.3 °C looks 15% as strong as one cooled 2 °C, not as strong as the plan's best cell.
+  const strength = coolStrength;
 
   // the real photo (same Map Tiles source as the 3D view, usually already in the browser cache); painted map otherwise
   useEffect(() => {
@@ -62,7 +62,7 @@ export default function PlanCompare({ block, placements, cooling, years, maxMapH
     const heat = (withPlan) => cellImage(rows, cols, (r, c) => [...heatColor((lst[r][c] - (withPlan ? coolAt(r, c) : 0) - lo) / span), 255]);
     const glow = maxCool > 0.005 && cellImage(rows, cols, (r, c) => {
       const f = strength(coolAt(r, c));
-      return f > 0.04 ? [127, 214, 255, Math.round(255 * (0.25 + 0.6 * f))] : null;
+      return f > 0.04 ? [127, 214, 255, Math.round(255 * (0.1 + 0.65 * f))] : null;
     });
     const ramp = maxCool > 0.005 && cellImage(rows, cols, (r, c) => {
       const f = strength(coolAt(r, c));
@@ -152,7 +152,7 @@ export default function PlanCompare({ block, placements, cooling, years, maxMapH
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink)' }}>{view === 'heat' ? `${lo.toFixed(1)}°` : '0°'}</span>
         <div style={{ flex: 1, height: 6, borderRadius: 3, background: view === 'heat' ? HEAT_CSS : COOL_CSS }} />
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink)', whiteSpace: 'nowrap' }}>
-          {view === 'heat' ? `${hi.toFixed(1)}° surface` : `−${maxCool.toFixed(1)}° cooler (log scale)`}
+          {view === 'heat' ? `${hi.toFixed(1)}° surface` : `−${COOL_FULL_C}° or more cooler`}
         </span>
       </div>
       <figcaption style={{ marginTop: 8, fontFamily: 'var(--font-mono)', fontSize: 10.5, lineHeight: 1.6, color: 'var(--muted)' }}>

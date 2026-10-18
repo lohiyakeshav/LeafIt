@@ -12,8 +12,9 @@ import { Dialog, Reveal, Pill, Spinner, ThemeToggle, useToast } from '../../shar
 import AppBar from '../../shared/layout/AppBar.jsx';
 import { Card } from '../../shared/layout/Card.jsx';
 import { useWide } from '../../shared/layout/useWide.js';
-import { degRange, displayCurrency, exposureRange, formatTons, inr, perDegreeRange } from '../../shared/lib/format.js';
+import { degRange, displayCurrency, exposureRange, formatDeg, formatTons, inr } from '../../shared/lib/format.js';
 import { flattenGrid } from '../../shared/heatmap/draw.js';
+import { TempsTable } from '../../shared/metrics/TempsTable.jsx';
 
 
 export default function SummaryPage() {
@@ -124,7 +125,7 @@ export default function SummaryPage() {
     ['co2', 'CO₂ captured', formatTons(m.co2_captured_kg_per_year), 'per year'],
     ['exposure', 'Still too hot', exposureRange(m), 'of outdoors'],
     ['cost', 'Total cost', inr(Number(m.total_cost_inr ?? 0)), Number(m.total_cost_inr ?? 0) > budget ? `over ${inr(budget)} budget` : `of ${inr(budget)} budget`],
-    ['per_degree', 'Cost per °C', perDegreeRange(m, inr), 'value for money'],
+    ['equity', 'Vulnerable residents', m.equity_cooling_c == null ? '—' : formatDeg(Number(m.equity_cooling_c)), m.equity_cooling_c == null ? 'no population data' : 'where they live, high end'],
   ];
 
   const step = (n, title, done, active, body) => (
@@ -208,6 +209,7 @@ export default function SummaryPage() {
                 </button>
               ))}
             </section>
+            {metrics?.temps && <Card style={{ padding: 16 }}><TempsTable temps={metrics.temps} landmarkLimit={4} /></Card>}
             {nextSteps}
             {error && <p role="alert" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--warn)' }}>{error}</p>}
           </div>

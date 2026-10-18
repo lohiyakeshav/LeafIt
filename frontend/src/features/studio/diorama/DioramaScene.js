@@ -9,7 +9,7 @@
 //   * pixel ratio capped at 1.5; everything is disposed in dispose()
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { heatColor } from '../../../shared/heatmap/draw.js';
+import { coolStrength, heatColor } from '../../../shared/heatmap/draw.js';
 import { crownRatio, speciesMaturity, speciesOf } from '../../../model/rules.js';
 import { zoneBounds } from '../../../model/zones.js';
 import { buildIndex, groundHit, pickBuilding } from './geometry.js';
@@ -490,7 +490,7 @@ export class DioramaScene {
         let [R, G, B] = heatColor((lst[i] - cool - this.minT) / this.span);
         let a = opacity;
         if (cool > 0.03) {
-          const g = Math.min(0.75, 0.15 + cool * 0.35);
+          const g = 0.75 * coolStrength(cool);   // absolute: matches the numbers, a 0.3 °C cell is a faint tint
           R = R * (1 - g) + 127 * g; G = G * (1 - g) + 214 * g; B = B * (1 - g) + 255 * g;
           a = opacity > 0 ? Math.max(opacity, 0.55) : g * 0.75;
         }

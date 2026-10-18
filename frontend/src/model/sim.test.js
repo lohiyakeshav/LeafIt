@@ -29,6 +29,11 @@ describe('browser simulator matches the Python one', () => {
       else expect(Math.abs(out.metrics.cost_per_degree_inr / c.expected.metrics.cost_per_degree_inr - 1)).toBeLessThan(0.01);
       for (const [name, v] of Object.entries(c.expected.metrics.landmark_cooling_c)) close(out.metrics.landmark_cooling_c[name], v, 2);
       for (const [k, d] of [['temp_reduction_c', 3], ['peak_reduction_c', 2], ['heat_exposure_pct', 1]]) close(out.metrics.low_estimate[k], c.expected.metrics.low_estimate[k], d);
+      // ground temperature before → after: the whole area, the hottest tenth, and each landmark
+      const want = c.expected.metrics.temps, got = out.metrics.temps;
+      for (const k of ['before', 'after', 'after_low']) { close(got.area[k], want.area[k], 2); close(got.hottest[k], want.hottest[k], 2); }
+      expect(Object.keys(got.landmarks).sort()).toEqual(Object.keys(want.landmarks).sort());
+      for (const [name, t] of Object.entries(want.landmarks)) for (const k of ['before', 'after', 'after_low']) close(got.landmarks[name][k], t[k], 2);
       expect(Math.abs(out.cooling.reduce((a, b) => a + b, 0) - c.expected.cooling_sum)).toBeLessThan(0.5);
       expect(Math.abs(Math.max(...out.cooling) - c.expected.cooling_max)).toBeLessThan(0.011);
       for (const [rc, v] of Object.entries(c.expected.cooling_samples)) {

@@ -92,3 +92,15 @@ def test_user_prices_change_costs_not_physics(block, cells):
     assert base["metrics"]["total_cost_inr"] == 6000 and cheap["metrics"]["total_cost_inr"] == 3000
     assert cheap["breakdown"]["unit_cost"]["tree"] == 1500
     assert cheap["metrics"]["temp_reduction_c"] == base["metrics"]["temp_reduction_c"]
+
+
+def test_before_after_temperatures_are_the_headline_cooling_in_plain_degrees(block, cells):
+    m = simulate(block, cells.trees(1000), 30)["metrics"]      # a plan big enough that the low end of the range still shows at 2 decimals
+    t = m["temps"]
+    assert abs((t["area"]["before"] - t["area"]["after"]) - m["temp_reduction_c"]) < 0.011        # same number, shown as a before → after
+    assert abs((t["area"]["before"] - t["area"]["after_low"]) - m["low_estimate"]["temp_reduction_c"]) < 0.011
+    assert t["area"]["before"] > t["area"]["after_low"] > t["area"]["after"]                       # the low end of the range cools less
+    assert t["hottest"]["before"] > t["area"]["before"]                                           # the hottest tenth really is hotter
+    for name, v in t["landmarks"].items():                                                        # each landmark's drop equals its landmark_cooling_c
+        assert abs((v["before"] - v["after"]) - m["landmark_cooling_c"][name]) < 0.02
+    assert simulate(block, [])["metrics"]["temps"]["area"]["before"] == simulate(block, [])["metrics"]["temps"]["area"]["after"]
