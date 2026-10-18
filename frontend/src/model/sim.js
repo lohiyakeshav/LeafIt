@@ -13,6 +13,7 @@ const { co2_kg_yr: TREE_CO2, canopy_m2: CANOPY_M2 } = MODEL.tree;
 const { nowak_gain: NOWAK_GAIN, nowak_canopy: NOWAK_CANOPY } = MODEL.air_quality;
 const LANDMARK_R = MODEL.landmark_radius_cells;
 const HOT_PCT = MODEL.hot_percentile;
+const HOTTEST_PCT = MODEL.hottest_percentile;   // "the hottest tenth of the ground" in the before → after table
 const OUTDOOR_BELOW = MODEL.outdoor_building_frac_below;
 
 function kernel(sigma) {
@@ -215,6 +216,18 @@ export function simulate(grid, placements, years = 10, unitCost = null) {
     return cnt ? round(sum / cnt, 2) : 0;
   };
   const landmarkCooling = Object.fromEntries(grid.landmarks.map((lm) => [lm.name, near(lm)]));
+
+  // ground temperature before → after (mean over `pick`ed outdoor cells): today, and with the plan at the high and low end of the range
+  const temps = (pick) => {
+    let b = 0, a = 0, l = 0, cnt = 0;
+    for (let i = 0; i < n; i++) if (outdoor[i] && pick(i)) { b += lst[i]; a += lst[i] - street[i]; l += lst[i] - low[i]; cnt++; }
+    return cnt ? { before: round(b / cnt, 2), after: round(a / cnt, 2), after_low: round(l / cnt, 2) } : null;
+  };
+  const hottestFrom = percentile(outLst, HOTTEST_PCT);
+  const tempsNear = (lm) => {
+    const r0 = Math.max(lm.row - LANDMARK_R, 0), r1 = Math.min(lm.row + LANDMARK_R, rows - 1), c0 = Math.max(lm.col - LANDMARK_R, 0), c1 = Math.min(lm.col + LANDMARK_R, cols - 1);
+    return temps((i) => { const r = Math.floor(i / cols), c = i % cols; return r >= r0 && r <= r1 && c >= c0 && c <= c1; });
+  };
   let equiv = 0;
   for (let i = 0; i < n; i++) equiv += ex.equiv[i];
 
@@ -233,6 +246,10 @@ export function simulate(grid, placements, years = 10, unitCost = null) {
       total_cost_inr: round(cost),
       cost_per_degree_inr: tempDrop > 1e-6 ? round(cost / tempDrop) : null,
       landmark_cooling_c: landmarkCooling,
+      temps: {
+        area: temps(() => true), hottest: temps((i) => lst[i] >= hottestFrom),
+        landmarks: Object.fromEntries(grid.landmarks.map((lm) => [lm.name, tempsNear(lm)]).filter(([, t]) => t)),
+      },
       low_estimate: {
         temp_reduction_c: round(lowDrop, 3),
         peak_reduction_c: round(lowMax, 2),

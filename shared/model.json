@@ -36,6 +36,7 @@
   },
   "landmark_radius_cells": 5,
   "hot_percentile": 75,
+  "hottest_percentile": 90,
   "outdoor_building_frac_below": 0.5,
   "placement_rules": {
     "tree": {

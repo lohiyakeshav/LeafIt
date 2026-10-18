@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { AnimatedNumber, InfoLabel, LABEL, Spinner } from '../ui';
-import { degRange, exposureRange, formatAqi, formatDeg, formatTons, inr, perDegreeRange } from '../lib/format.js';
+import { degRange, exposureRange, formatAqi, formatDeg, formatTons, inr } from '../lib/format.js';
+import { TempsTable } from './TempsTable.jsx';
 
 const n = (src, k) => Number(src?.[k] ?? 0);
 
@@ -14,7 +15,6 @@ export function ImpactPanel({ metrics: m, breakdown: b, budget, years, busy, err
   const cost = n(m, 'total_cost_inr');
   const over = cost > budget;
   const parts = b?.cost_parts ?? {};
-  const landmarks = Object.entries(m?.landmark_cooling_c ?? {}).sort((x, y) => y[1] - x[1]);
 
   const tap = (key) => ({ onClick: () => onInfo?.(key), style: { cursor: 'pointer', minWidth: 0 } });
 
@@ -67,9 +67,8 @@ export function ImpactPanel({ metrics: m, breakdown: b, budget, years, busy, err
           ['exposure', 'STILL TOO HOT', `${exposureRange(m)} of outdoors`],
           ['air', 'AIR COOLING', `${formatDeg(n(m, 'air_reduction_c'))} at head height`],
           ['equity', 'FOR VULNERABLE RESIDENTS', m?.equity_cooling_c == null ? 'no population data' : `${formatDeg(n(m, 'equity_cooling_c'))} in the most exposed areas (high end)`],
-          ['per_degree', 'COST PER °C', perDegreeRange(m, inr)],
         ].map(([key, label, val]) => (
-          <div key={key} {...tap(key)}>
+          <div key={key} {...tap(key)} style={{ ...tap(key).style, ...(key === 'equity' ? { gridColumn: '1 / -1' } : {}) }}>
             <InfoLabel label={label} onInfo={() => onInfo?.(key)} />
             <div style={{ ...NUM, marginTop: 6, fontSize: 16, letterSpacing: '-0.02em' }}>{val}</div>
           </div>
@@ -101,9 +100,7 @@ export function ImpactPanel({ metrics: m, breakdown: b, budget, years, busy, err
         ['Shaded bus stops', `${Math.round(n(b, 'stops'))}`, inr(parts.shade_stop ?? 0)],
       ]} />
 
-      {landmarks.length > 0 && (
-        <SmallTable title="COOLING AT LANDMARKS · HIGH END" rows={landmarks.map(([name, c]) => [name, '', formatDeg(c)])} />
-      )}
+      <TempsTable temps={m?.temps} />
     </div>
   );
 }
